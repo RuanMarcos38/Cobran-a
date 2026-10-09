@@ -9,6 +9,7 @@ await db.exec(base.replace('create extension if not exists "pgcrypto";',''));
 await db.exec(await readFile(new URL('../database/002-app.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/003-admin-onboarding.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/004-explicit-deny-policies.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/005-report-details.sql',import.meta.url),'utf8'));
 const admin='11111111-1111-4111-8111-111111111111',collector='22222222-2222-4222-8222-222222222222',creditor='33333333-3333-4333-8333-333333333333',other='44444444-4444-4444-8444-444444444444';
 const tenant='00000000-0000-0000-0000-000000000000',t2='55555555-5555-4555-8555-555555555555';
 await db.exec(`insert into auth.users(id) values('${admin}'),('${collector}'),('${creditor}'),('${other}');insert into public.cobranca_tenants(id,name) values('${t2}','Segundo tenant');insert into public.cobranca_profiles(id,tenant_id,name,role,discount_limit) values('${admin}','${tenant}','Admin','admin',100),('${collector}','${tenant}','Operador','collector',10),('${other}','${t2}','Outro','admin',100);`);
