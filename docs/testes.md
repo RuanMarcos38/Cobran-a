@@ -34,9 +34,19 @@ As requisições de negócio chegaram à função SQL real no PostgreSQL local.
 Supabase Auth e o transporte remoto foram substituídos por fixtures somente no
 teste. As capturas contêm dados sintéticos de teste, nunca dados de produção.
 
+## PostgreSQL hospedado — aprovado
+
+No projeto Supabase indicado pelo usuário, foram executados cadastro de credor e
+devedor, criação de processo, acordo, soma de parcelas, pagamento parcial,
+rejeição de duplicidade e verificação dos privilégios. Todos passaram.
+O teste usou uma transação desfeita ao final; nenhuma receita de teste permaneceu.
+Isso valida a API no banco remoto, mas não substitui o teste de login com Supabase Auth.
+Após políticas explícitas de bloqueio de acesso direto, o verificador de segurança
+do Supabase retornou lista de avisos vazia.
+
 ## Não executado
 
-Testes do Supabase hospedado, provedores externos, deploy, performance de grandes
+Testes de login real com Supabase Auth, provedores externos, deploy, performance de grandes
 carteiras, recuperação de backup, revisão operacional/jurídica e homologação
-completa de todos os módulos do prompt. A organização do projeto novo ainda
-aguarda indicação do usuário.
+completa de todos os módulos do prompt. O usuário precisa criar sua senha e
+confirmar o e-mail administrativo na tela de cadastro.

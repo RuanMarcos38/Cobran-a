@@ -25,8 +25,9 @@ Não é apresentado como SaaS completo ou homologado para produção.
 
 ## Ainda necessário para cumprir todo o prompt
 
-- Organização e criação do projeto Supabase separado indicadas pelo usuário.
-- Publicação e testes reais de Supabase Auth e sessão hospedada.
+- Publicação do frontend e teste completo de Supabase Auth após o usuário criar
+  sua senha e confirmar o e-mail. O banco separado indicado já está conectado;
+  esquema e regras financeiras foram testados no PostgreSQL hospedado.
 - Provisionamento de usuários e portal credor com navegação dedicada.
 - Todos os campos extensivos de cadastro, múltiplos contatos/endereços/títulos.
 - Juros/multa auditáveis: taxas são cadastradas, mas não aplicadas automaticamente.

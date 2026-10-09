@@ -11,6 +11,7 @@ async function request(route,options={}){
 }
 export async function login(email,password){session=await request('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email,password})});sessionStorage.setItem('cobranca_session',JSON.stringify(session));}
 export async function signUp(email,password){return request('/auth/v1/signup',{method:'POST',body:JSON.stringify({email,password})});}
+export async function claimAdmin(){return request('/rest/v1/rpc/cobranca_claim_admin',{method:'POST',body:'{}'});}
 export async function logout(){try{await request('/auth/v1/logout',{method:'POST'});}finally{session=null;sessionStorage.removeItem('cobranca_session');}}
 export async function rpc(action,payload={}){
   if(session&&session.expires_at<Date.now()/1000+60){session=await request('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:session.refresh_token})});sessionStorage.setItem('cobranca_session',JSON.stringify(session));}

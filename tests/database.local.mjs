@@ -3,15 +3,23 @@ const {PGlite}=await import(process.env.PGLITE_MODULE||'@electric-sql/pglite');
 import {readFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const db=new PGlite();
-await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;`);
+await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;`);
 let base=await readFile(new URL('../database/supabase-schema.sql',import.meta.url),'utf8');
 await db.exec(base.replace('create extension if not exists "pgcrypto";',''));
 await db.exec(await readFile(new URL('../database/002-app.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/003-admin-onboarding.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/004-explicit-deny-policies.sql',import.meta.url),'utf8'));
 const admin='11111111-1111-4111-8111-111111111111',collector='22222222-2222-4222-8222-222222222222',creditor='33333333-3333-4333-8333-333333333333',other='44444444-4444-4444-8444-444444444444';
 const tenant='00000000-0000-0000-0000-000000000000',t2='55555555-5555-4555-8555-555555555555';
-await db.exec(`insert into auth.users values('${admin}'),('${collector}'),('${creditor}'),('${other}');insert into public.cobranca_tenants(id,name) values('${t2}','Segundo tenant');insert into public.cobranca_profiles(id,tenant_id,name,role,discount_limit) values('${admin}','${tenant}','Admin','admin',100),('${collector}','${tenant}','Operador','collector',10),('${other}','${t2}','Outro','admin',100);`);
+await db.exec(`insert into auth.users(id) values('${admin}'),('${collector}'),('${creditor}'),('${other}');insert into public.cobranca_tenants(id,name) values('${t2}','Segundo tenant');insert into public.cobranca_profiles(id,tenant_id,name,role,discount_limit) values('${admin}','${tenant}','Admin','admin',100),('${collector}','${tenant}','Operador','collector',10),('${other}','${t2}','Outro','admin',100);`);
 async function as(id){await db.exec(`reset role;set test.uid='${id}';set role authenticated;`);}
 async function rpc(action,payload={}){const r=await db.query('select public.cobranca_app($1,$2) result',[action,JSON.stringify(payload)]);return r.rows[0].result;}
+const pending='66666666-6666-4666-8666-666666666666';
+await db.exec(`insert into auth.users(id,email) values('${pending}','admin-test@example.invalid');insert into cobranca_private.bootstrap(email,tenant_id) values('admin-test@example.invalid','${tenant}');`);
+await as(pending);await assert.rejects(()=>db.query('select public.cobranca_claim_admin()'));
+await db.exec(`reset role;update auth.users set email_confirmed_at=now() where id='${pending}';set role authenticated;`);
+assert.equal((await db.query('select public.cobranca_claim_admin() result')).rows[0].result.ready,true);
+assert.equal((await db.query('select public.cobranca_claim_admin() result')).rows[0].result.ready,true);
 await as(admin);
 const c=(await rpc('save',{entity:'creditors',name:'Credor teste',document:'123',fee_percent:'10'})).id;
 const b=(await rpc('save',{entity:'debtors',name:'Devedor teste',document:'456',creditor_id:c})).id;
