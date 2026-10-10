@@ -82,3 +82,5 @@ html[data-theme=dark] #global-search{background:#26364a;color:#e0e8f2;border-col
 html[data-theme=dark] .footer{background:#182333;color:#e0e8f2;border-color:#39485c}
 html[data-theme=dark] :is(.detail-grid div,.history article,.crm-timeline article,.receipt,.lookup-results,.lookup-search,.lookup-results button){background:#1c2838;color:#e0e8f2;border-color:#39485c}
 @media print{html[data-theme=dark] :is(h1,h2,h3,.metric strong){color:black!important}}
+
+html[data-theme=dark] .toolbar{background:#182333;color:#e0e8f2;border-color:#39485c}
