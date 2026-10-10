@@ -1,0 +1,246 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Cobrança — API de integração",
+    "version": "1.0.0",
+    "description": "API documentada com autenticação e isolamento por empresa. Chave de borderô permite somente envio ao credor conectado. Não permite leitura pública de informações. Crie ou revogue chaves em Cadastro > Integrações / API."
+  },
+  "servers": [
+    {
+      "url": "https://financeiro.rrestrategiaperformance.com.br"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "IntegrationKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Integration-Key"
+      },
+      "UserSession": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/api/v1/borderos": {
+      "post": {
+        "summary": "Receber borderô automaticamente",
+        "description": "Configure o sistema do credor para enviar novos borderôs a este endpoint. external_id deve ser único na conexão; repetições devolvem o resultado anterior. external_ref identifica cada título no credor. Lote inválido é rejeitado integralmente. Taxas vêm do contrato cadastrado para o credor. Chave nunca deve ser colocada em URL ou código público.",
+        "security": [
+          {
+            "IntegrationKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "external_id",
+                  "items"
+                ],
+                "properties": {
+                  "external_id": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "contract_ref": {
+                    "type": "string"
+                  },
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "external_ref",
+                        "original_amount",
+                        "due_date",
+                        "debtor_name",
+                        "debtor_document"
+                      ],
+                      "properties": {
+                        "external_ref": {
+                          "type": "string"
+                        },
+                        "original_amount": {
+                          "type": "string",
+                          "example": "1000.00"
+                        },
+                        "due_date": {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        "debtor_name": {
+                          "type": "string"
+                        },
+                        "debtor_document": {
+                          "type": "string"
+                        },
+                        "debtor_email": {
+                          "type": "string"
+                        },
+                        "debtor_phone": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Borderô recebido ou repetição reconhecida"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Chave ausente ou inválida"
+          },
+          "413": {
+            "description": "Lote excede 1 MB"
+          },
+          "429": {
+            "description": "Limite de requisições"
+          },
+          "502": {
+            "description": "Backend temporariamente indisponível"
+          }
+        }
+      }
+    },
+    "/api/v1/{action}": {
+      "post": {
+        "summary": "Operação autenticada da plataforma",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "profile",
+                "lookups",
+                "processes",
+                "detail",
+                "crm_list",
+                "crm_detail",
+                "crm_save",
+                "crm_activity",
+                "crm_tasks",
+                "crm_commissions"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado em data"
+          },
+          "401": {
+            "description": "Sessão ausente ou expirada"
+          },
+          "400": {
+            "description": "Validação ou permissão rejeitada pelo backend"
+          }
+        }
+      }
+    },
+    "/api/v1/erp_sync": {
+      "post": {
+        "summary": "ERP: dívidas vencidas, baixas e retorno de recebimentos/estornos",
+        "description": "Contrato canônico. Requer mapeamento no integrador do ERP.",
+        "security": [
+          {
+            "IntegrationKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "provider",
+                  "operation"
+                ],
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "sap",
+                      "totvs",
+                      "protheus",
+                      "senior",
+                      "generic"
+                    ]
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "overdue",
+                      "payments",
+                      "poll"
+                    ]
+                  },
+                  "external_id": {
+                    "type": "string"
+                  },
+                  "cursor": {
+                    "type": "integer"
+                  },
+                  "items": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evento aplicado ou repetição idempotente; fila restrita ao credor"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Chave ausente"
+          }
+        }
+      }
+    }
+  }
+}
