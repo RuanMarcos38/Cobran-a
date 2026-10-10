@@ -1,3 +1,4 @@
+import {renderSector} from './crm.mjs';
 import {brl,parseCsv} from './money.mjs';
 export const financeSections=['Contas a pagar','Contas a receber','Faturamento','Crédito','Conciliação bancária','Histórico dos clientes','Integrações ERP'];
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -8,11 +9,7 @@ const btn=(id,l)=>`<button data-fin="${esc(id)}">${esc(l)}</button>`;
 const today=()=>new Date().toLocaleDateString('en-CA');
 export async function renderFinance(section,ctx,target){
  const {api,modal,guard,notify}=ctx,again=()=>renderFinance(section,ctx,target),on=(id,fn)=>target.querySelector(`[data-fin="${id}"]`)?.addEventListener('click',()=>guard(fn));
- if(section==='Integrações ERP'){
-  const d=await api.rpc('erp_config',{}),providers=[{id:'sap',name:'SAP'},{id:'totvs',name:'TOTVS'},{id:'protheus',name:'TOTVS Protheus'},{id:'senior',name:'Senior Sistemas'},{id:'generic',name:'API genérica'}];
-  target.innerHTML=`<div class=toolbar>${btn('refresh','Atualizar')}</div><div class=panel><h3>SAP · TOTVS · Protheus · Senior Sistemas</h3><p>Recepção de dívidas vencidas e baixas, com prevenção de duplicidade. Retorno de recebimentos e estornos para o ERP por fila de eventos.</p><p>Cadastre o credor e gere sua chave em Cadastro › Integrações / API. Selecione o fornecedor e a versão abaixo. O envio e a leitura da fila precisam ser configurados no ERP ou no integrador da empresa.</p><p><strong>Conexão externa pendente de homologação.</strong> Identificar o fornecedor aqui não estabelece comunicação com ele.</p><code>${esc(location.origin)}/api/v1/erp_sync</code><p><a href=/api/openapi.json target=_blank rel=noopener>Contrato da API</a></p>${table(d.rows,[['name','Conexão'],['creditor_name','Credor'],['provider','ERP'],['product_version','Produto / versão'],['active','Ativa'],['last_received_at','Último evento']],r=>btn('configure:'+r.id,'Configurar ERP'))}<h3>Eventos recebidos</h3>${table(d.events,[['external_id','Evento'],['created_at','Data'],['result','Resultado']])}</div>`;
-  on('refresh',again);for(const r of d.rows)on('configure:'+r.id,()=>modal('Configuração ERP',choice('provider','Fornecedor',providers,r.provider)+field('product_version','Produto e versão',r.product_version)+'<p>Não informe senhas ou chaves neste campo.</p>',data=>api.rpc('erp_config',{operation:'save',id:r.id,...data})));return;
- }
+ if(section==='Integrações ERP')return renderSector('Integrações / API',ctx,target);
  const ledger=await api.rpc('fin_list',{}),creditors=[{id:'',name:'Sem vínculo'},...ledger.creditors];
  if(['Contas a pagar','Contas a receber','Faturamento'].includes(section)){
   const kind=section==='Contas a pagar'?'payable':section==='Faturamento'?'invoice':'receivable',rows=ledger.rows.filter(r=>kind==='receivable'?['invoice','receivable'].includes(r.kind):r.kind===kind),ids=new Set(rows.map(r=>r.id));
