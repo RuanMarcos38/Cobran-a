@@ -2,12 +2,14 @@ import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
+import {handleApi} from './api-http.mjs';
 const root=path.resolve(fileURLToPath(new URL('./web/',import.meta.url)));
 const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.svg':'image/svg+xml'};
 const server=http.createServer(async(req,res)=>{
   res.setHeader('X-Content-Type-Options','nosniff');
   res.setHeader('Referrer-Policy','same-origin');
   res.setHeader('Content-Security-Policy',"default-src 'self'; connect-src 'self' https://*.supabase.co; style-src 'self'; img-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  if(await handleApi(req,res))return;
   if(req.method!=='GET'){res.writeHead(405);return res.end();}
   if(req.url==='/health'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({status:'ok',databaseConfigured:Boolean(process.env.SUPABASE_URL&&process.env.SUPABASE_PUBLISHABLE_KEY)}));}
   res.setHeader('Cache-Control','no-cache');

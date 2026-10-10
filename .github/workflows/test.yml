@@ -12,4 +12,5 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run test:db
+      - run: node tests/sectors.local.mjs
       - run: node --check web/app.mjs && node --check server.mjs

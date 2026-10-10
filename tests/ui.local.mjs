@@ -26,6 +26,8 @@ await db.exec(await readFile(new URL('../database/007-contract-charges.sql',impo
 await db.exec(await readFile(new URL('../database/008-company-members.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/009-client-access.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/010-profile-levels.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/011-sectors-api.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/012-private-sector-policies.sql',import.meta.url),'utf8'));
 
 const id='11111111-1111-4111-8111-111111111111';
 
@@ -109,14 +111,14 @@ try{
 
  }
 
- await page.locator('[data-module=Relatórios]').click();await page.locator('.metrics').waitFor();
+ await page.setViewportSize({width:1366,height:768});await page.locator('[data-module=Relatórios]').click();await page.locator('.metrics').waitFor();
 
 
  // Exercise every published navigation entry and report button against the local database.
  await page.setViewportSize({width:1366,height:768});
- for(const module of ['Cadastro','Processo','Financeiro','Comercial','Relatórios']){
+ for(const module of ['Cadastro','Processo','Financeiro','Relatórios']){
   await page.locator(`[data-module="${module}"]`).click();
-  const sections=await page.locator('[data-section]').evaluateAll(nodes=>nodes.map(n=>n.dataset.section));
+  const sections=await page.locator(`[data-section][data-parent="${module}"]`).evaluateAll(nodes=>nodes.map(n=>n.dataset.section).filter(s=>!['Regras de comissão','Distribuição automática','Integrações / API'].includes(s)));
   for(const section of sections){
    await page.locator(`[data-section="${section}"]`).click();
    await page.waitForFunction(()=>document.querySelector('#content').children.length>0);
@@ -131,8 +133,8 @@ try{
  for(const [module,section,fields] of [
   ['Cadastro','Cadastros auxiliares',{name:'Auxiliar UI'}],
   ['Financeiro','Despesas',{name:'Despesa UI',amount:'30.00',due_date:'2026-10-10',category:'Operação'}],
-  ['Comercial','Prospecção',{name:'Prospect UI',document:'654321'}],
-  ['Comercial','Agendamentos',{name:'Agenda UI',due_at:'2026-10-12T10:00'}]
+  
+  ['Processo','Agenda da cobrança',{name:'Agenda UI',due_at:'2026-10-12T10:00'}]
  ]){
   await page.locator(`[data-module="${module}"]`).click();await page.locator(`[data-section="${section}"]`).click();await page.locator('[data-action=new]').click();
   for(const [name,value] of Object.entries(fields))await page.locator(`dialog [name="${name}"]`).fill(value);
@@ -144,11 +146,19 @@ try{
  await page.locator('[data-action=notifications]').click();await page.locator('dialog').waitFor();await page.locator('dialog [data-cancel]').first().click();
  await page.locator('[data-action=settings]').click();await page.locator('dialog [name=name]').fill('Assessoria UI');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('.company').textContent.includes('Assessoria UI'));
 
+ // Configure new operational screens without touching production records.
+ const automaticCollector='99999999-9999-4999-8999-999999999999';
+ await db.exec(`reset role;insert into auth.users(id) values('${automaticCollector}');insert into public.cobranca_profiles(id,tenant_id,name,role) values('${automaticCollector}','00000000-0000-0000-0000-000000000000','Negociador automático UI','collector');set role authenticated;`);
+ await page.locator('[data-module=Cadastro]').click();await page.locator('[data-section="Regras de comissão"]').click();await page.locator('[data-sector=new]').click();await page.locator('dialog [name=name]').fill('Comissão UI');await page.locator('dialog [name=sector]').selectOption('collections');await page.locator('dialog [name=user_id]').selectOption(automaticCollector);await page.locator('dialog [name=rate]').fill('5');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Comissão UI',{exact:true}).waitFor();
+ await page.locator('[data-section="Distribuição automática"]').click();await page.locator('[data-sector=configure]').click();await page.locator('dialog [name=enabled]').selectOption('true');await page.locator(`dialog [name="member_${automaticCollector}"]`).check();await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Ativada · 1 negociadores na equipe.',{exact:true}).waitFor();
+ await page.locator('[data-section="Integrações / API"]').click();await page.locator('[data-sector=new]').click();await page.locator('dialog [name=name]').fill('Conexão UI');await page.locator('dialog [type=submit]').click();await page.getByRole('heading',{name:'Chave da conexão'}).waitFor();assert.equal((await page.getByLabel('Chave de integração').inputValue()).length,64);await page.locator('dialog [data-cancel]').first().click();await page.locator('[data-sector^="disable:"]').click();await page.getByText('Desativada · Último borderô: Ainda não recebido',{exact:true}).waitFor();
+ console.log('PASS operations UI: commission rule, automatic distribution, integration key creation and revocation.');
+
  await page.locator('[data-module=Processo]').click();await page.locator('[data-action=new]').click();const due=new Date();due.setUTCDate(due.getUTCDate()-30);
  await page.locator('dialog [name=external_ref]').fill('UI-CHARGES');await page.locator('dialog [name=original_amount]').fill('100.00');await page.locator('dialog [name=due_date]').fill(due.toISOString().slice(0,10));await page.locator('dialog [name=contract_ref]').fill('UI-CONTRACT');await page.locator('dialog [name=financial_mode]').selectOption('monthly');await page.locator('dialog [name=interest_percent]').fill('3');await page.locator('dialog [name=fine_percent]').fill('2');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.locator('[data-row]').filter({hasText:'UI-CHARGES'}).click();await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('105,00'));
  await page.locator('[data-action=contract]').click();await page.locator('dialog [name=financial_mode]').selectOption('daily');await page.locator('dialog [name=interest_percent]').fill('1');await page.locator('dialog [name=fine_percent]').fill('0');await page.locator('dialog [name=grace_days]').fill('5');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('125,00'));
  await page.locator('[data-action=payment]').click();await page.locator('dialog [name=amount]').fill('125.00');await page.locator('dialog [name=reference]').fill('UI-CHARGES-PAID');await page.locator('dialog [name=paid_date]').fill(new Date().toISOString().slice(0,10));await page.locator('dialog [name=reason]').fill('Quitação com encargos');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('Quitado'));
- assert.equal(await page.locator('#message').innerText(),'');
+ assert.match(await page.locator('#message').innerText(),/^$|^Conexão desativada\.$/);
  await page.getByRole('button',{name:'Sair',exact:true}).click();await page.locator('#login').waitFor();
 
 
@@ -157,8 +167,23 @@ try{
  await db.exec(`reset role;update public.cobranca_profiles set role='supervisor',can_manage_users=false where id='${id}';set role authenticated;`);
  await page.locator('#login [name=email]').fill('test@example.invalid');await page.locator('#login [name=password]').fill('test-password');await page.getByRole('button',{name:'Entrar',exact:true}).click();await page.locator('#filters').waitFor();await page.locator('[data-module=Cadastro]').click();assert.equal(await page.locator('[data-section=Usuários]').count(),0);assert.equal(await page.locator('[data-action=settings]').count(),0);
  await db.exec(`reset role;update public.cobranca_profiles set can_manage_users=true where id='${id}';set role authenticated;`);await page.reload();await page.locator('#filters').waitFor();await page.locator('[data-module=Cadastro]').click();await page.locator('[data-section=Usuários]').click();await page.getByRole('button',{name:'Criar usuário',exact:true}).click();await page.locator('dialog [name=role]').waitFor();assert.deepEqual(await page.locator('dialog [name=role] option').evaluateAll(os=>os.map(o=>o.value)),['collector','creditor']);await page.locator('dialog [name=name]').fill('Negociador criado pelo gestor');await page.locator('dialog [name=email]').fill('manager-created@example.invalid');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Negociador criado pelo gestor',{exact:true}).waitFor();
- await db.exec(`reset role;update public.cobranca_profiles set role='collector',can_manage_users=false where id='${id}';set role authenticated;`);await page.reload();await page.locator('#filters').waitFor();assert.equal(await page.locator('[data-module=Financeiro]').count(),0);await page.locator('[data-module=Cadastro]').click();assert.equal(await page.locator('[data-section=Usuários]').count(),0);assert.equal(await page.locator('[data-section=Clientes]').count(),0);await page.locator('[data-section=Devedores]').click();await page.locator('[data-row]').first().waitFor();await page.locator('[data-row]').first().click();await page.getByRole('heading',{name:'Consultar devedor'}).waitFor();assert.equal(await page.locator('dialog [type=submit]').count(),0);await page.locator('dialog').getByRole('button',{name:'Fechar',exact:true}).click();await page.locator('[data-module=Comercial]').click();await page.locator('[data-section=Agendamentos]').click();await page.locator('[data-action=new]').click();await page.locator('dialog [name=name]').fill('Agenda do negociador');await page.locator('dialog [name=due_at]').fill('2026-10-12T10:00');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Agenda do negociador',{exact:true}).waitFor();await page.getByRole('button',{name:'Sair',exact:true}).click();await page.locator('#login').waitFor();
+ await db.exec(`reset role;update public.cobranca_profiles set role='collector',can_manage_users=false where id='${id}';set role authenticated;`);await page.reload();await page.locator('#filters').waitFor();assert.equal(await page.locator('[data-module=Financeiro]').count(),0);await page.locator('[data-module=Cadastro]').click();assert.equal(await page.locator('[data-section=Usuários]').count(),0);assert.equal(await page.locator('[data-section=Clientes]').count(),0);await page.locator('[data-section=Devedores]').click();await page.locator('[data-row]').first().waitFor();await page.locator('[data-row]').first().click();await page.getByRole('heading',{name:'Consultar devedor'}).waitFor();assert.equal(await page.locator('dialog [type=submit]').count(),0);await page.locator('dialog').getByRole('button',{name:'Fechar',exact:true}).click();assert.equal(await page.locator('[data-module=Comercial]').count(),0);await page.locator('[data-module=Processo]').click();await page.locator('[data-section="Agenda da cobrança"]').click();await page.locator('[data-action=new]').click();await page.locator('dialog [name=name]').fill('Agenda do negociador');await page.locator('dialog [name=due_at]').fill('2026-10-12T10:00');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Agenda do negociador',{exact:true}).waitFor();await page.getByRole('button',{name:'Sair',exact:true}).click();await page.locator('#login').waitFor();
  console.log('PASS UI levels: manager delegated user creation, negotiator readonly debtor and personal appointment.');
+
+ // Commercial sector has its own CRM and cannot navigate to collections.
+ await db.exec(`reset role;update public.cobranca_profiles set role='commercial' where id='${id}';set role authenticated;`);
+ await page.locator('#login [name=email]').fill('test@example.invalid');await page.locator('#login [name=password]').fill('test-password');await page.getByRole('button',{name:'Entrar',exact:true}).click();await page.locator('[data-sector=new]').waitFor();
+ assert.equal(await page.locator('[data-module=Processo]').count(),0);assert.equal(await page.locator('[data-module=Cadastro]').count(),0);assert.equal(await page.locator('[data-module=Financeiro]').count(),0);
+ await page.locator('[data-sector=new]').click();await page.locator('dialog [name=name]').fill('Oportunidade CRM UI');await page.locator('dialog [name=amount]').fill('1000');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Oportunidade CRM UI',{exact:true}).waitFor();
+ await page.locator('[data-move]').first().selectOption('Negociação');await page.locator('.kanban-column').filter({has:page.getByRole('heading',{name:'Negociação'})}).getByText('Oportunidade CRM UI',{exact:true}).waitFor();
+ await page.locator('[data-sector^="attend:"]').first().click();await page.locator('dialog [name=subject]').fill('Contato de teste');await page.locator('dialog [name=content]').fill('Registro de atendimento');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});
+ await page.locator('[data-sector^="attend:"]').first().click();await page.getByText('Registro de atendimento',{exact:true}).waitFor();await page.locator('dialog [data-cancel]').first().click();
+ await page.locator('[data-section=Agendamentos]').click();await page.locator('[data-sector=new]').click();await page.locator('dialog [name=name]').fill('Agenda CRM UI');await page.locator('dialog [name=due_at]').fill('2026-10-20T10:00');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Agenda CRM UI',{exact:true}).waitFor();
+ for(const section of ['Funil / Kanban','Atendimento','Comissões comerciais']){await page.locator(`[data-section="${section}"]`).click();await page.locator('[data-sector=refresh]').waitFor();await page.locator('[data-sector=refresh]').click();}
+ await page.locator('[data-action=notifications]').click();await page.getByRole('heading',{name:'Pendências operacionais'}).waitFor();await page.locator('dialog [data-cancel]').first().click();await page.keyboard.press('F7');assert.equal(await page.locator('[data-module=Processo]').count(),0);
+ await page.setViewportSize({width:390,height:844});await page.locator('[data-action=menu]').click();await page.locator('[data-section="Funil / Kanban"]').click();assert.equal(await page.evaluate(()=>document.body.classList.contains('menu-open')),false);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.locator('[data-sector=refresh]').waitFor();await page.setViewportSize({width:1366,height:768});
+ await page.getByRole('button',{name:'Sair',exact:true}).click();await page.locator('#login').waitFor();
+ console.log('PASS CRM UI: commercial-only navigation, opportunity creation, Kanban stage, attendance history, task and commissions.');
  // Restricted client menus and administrator-granted capabilities.
  await db.exec(`reset role;update public.cobranca_profiles set role='creditor',creditor_id=(select id from public.cobranca_creditors where name='Credor UI' limit 1) where id='${id}';set role authenticated;`);
  await page.locator('#login [name=email]').fill('test@example.invalid');await page.locator('#login [name=password]').fill('test-password');await page.getByRole('button',{name:'Entrar',exact:true}).click();await page.locator('#filters').waitFor();
