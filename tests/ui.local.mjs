@@ -25,6 +25,7 @@ await db.exec(await readFile(new URL('../database/006-security-validation.sql',i
 await db.exec(await readFile(new URL('../database/007-contract-charges.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/008-company-members.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/009-client-access.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/010-profile-levels.sql',import.meta.url),'utf8'));
 
 const id='11111111-1111-4111-8111-111111111111';
 
@@ -94,7 +95,7 @@ try{
 
  await page.getByRole('button',{name:'Consultar',exact:true}).click();await page.locator('[data-row]').first().waitFor();
 
- for(const [width,height] of [[1920,1080],[1366,768],[1024,768],[768,1024],[390,844]]){
+ for(const [width,height] of [[1920,1080],[1366,768],[1024,768],[768,1024],[600,960],[390,844],[320,700]]){
 
   await page.setViewportSize({width,height});await page.waitForTimeout(100);
 
@@ -151,6 +152,13 @@ try{
  await page.getByRole('button',{name:'Sair',exact:true}).click();await page.locator('#login').waitFor();
 
 
+
+ // Manager / negotiator navigation and user creation controls.
+ await db.exec(`reset role;update public.cobranca_profiles set role='supervisor',can_manage_users=false where id='${id}';set role authenticated;`);
+ await page.locator('#login [name=email]').fill('test@example.invalid');await page.locator('#login [name=password]').fill('test-password');await page.getByRole('button',{name:'Entrar',exact:true}).click();await page.locator('#filters').waitFor();await page.locator('[data-module=Cadastro]').click();assert.equal(await page.locator('[data-section=Usuários]').count(),0);assert.equal(await page.locator('[data-action=settings]').count(),0);
+ await db.exec(`reset role;update public.cobranca_profiles set can_manage_users=true where id='${id}';set role authenticated;`);await page.reload();await page.locator('#filters').waitFor();await page.locator('[data-module=Cadastro]').click();await page.locator('[data-section=Usuários]').click();await page.getByRole('button',{name:'Criar usuário',exact:true}).click();await page.locator('dialog [name=role]').waitFor();assert.deepEqual(await page.locator('dialog [name=role] option').evaluateAll(os=>os.map(o=>o.value)),['collector','creditor']);await page.locator('dialog [name=name]').fill('Negociador criado pelo gestor');await page.locator('dialog [name=email]').fill('manager-created@example.invalid');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Negociador criado pelo gestor',{exact:true}).waitFor();
+ await db.exec(`reset role;update public.cobranca_profiles set role='collector',can_manage_users=false where id='${id}';set role authenticated;`);await page.reload();await page.locator('#filters').waitFor();assert.equal(await page.locator('[data-module=Financeiro]').count(),0);await page.locator('[data-module=Cadastro]').click();assert.equal(await page.locator('[data-section=Usuários]').count(),0);assert.equal(await page.locator('[data-section=Clientes]').count(),0);await page.locator('[data-section=Devedores]').click();await page.locator('[data-row]').first().waitFor();await page.locator('[data-row]').first().click();await page.getByRole('heading',{name:'Consultar devedor'}).waitFor();assert.equal(await page.locator('dialog [type=submit]').count(),0);await page.locator('dialog').getByRole('button',{name:'Fechar',exact:true}).click();await page.locator('[data-module=Comercial]').click();await page.locator('[data-section=Agendamentos]').click();await page.locator('[data-action=new]').click();await page.locator('dialog [name=name]').fill('Agenda do negociador');await page.locator('dialog [name=due_at]').fill('2026-10-12T10:00');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Agenda do negociador',{exact:true}).waitFor();await page.getByRole('button',{name:'Sair',exact:true}).click();await page.locator('#login').waitFor();
+ console.log('PASS UI levels: manager delegated user creation, negotiator readonly debtor and personal appointment.');
  // Restricted client menus and administrator-granted capabilities.
  await db.exec(`reset role;update public.cobranca_profiles set role='creditor',creditor_id=(select id from public.cobranca_creditors where name='Credor UI' limit 1) where id='${id}';set role authenticated;`);
  await page.locator('#login [name=email]').fill('test@example.invalid');await page.locator('#login [name=password]').fill('test-password');await page.getByRole('button',{name:'Entrar',exact:true}).click();await page.locator('#filters').waitFor();
@@ -162,7 +170,7 @@ try{
  console.log('PASS UI portal cliente: menus, tabs and export hidden until granted; all consultations revocable.');
  assert.deepEqual(errors,[]);
 
- console.log('PASS UI local: todos os módulos, relatórios, CSV, impressão acionada, despesas, prospecção, agenda, usuários, documentos, acordo, estorno e encargos contratuais;  login/logout, cliente, devedor, processo, histórico, pagamento, saldo, F5, painel e cinco resoluções. Supabase Auth foi substituído por fixture de teste; PostgreSQL e RPC reais locais.');
+ console.log('PASS UI local: todos os módulos, relatórios, CSV, impressão acionada, despesas, prospecção, agenda, usuários, documentos, acordo, estorno e encargos contratuais;  login/logout, cliente, devedor, processo, histórico, pagamento, saldo, F5, painel e sete resoluções. Supabase Auth foi substituído por fixture de teste; PostgreSQL e RPC reais locais.');
 
 }finally{await browser?.close();server.kill();await db.close();}
 

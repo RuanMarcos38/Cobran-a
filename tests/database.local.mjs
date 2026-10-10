@@ -14,6 +14,7 @@ await db.exec(await readFile(new URL('../database/006-security-validation.sql',i
 await db.exec(await readFile(new URL('../database/007-contract-charges.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/008-company-members.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/009-client-access.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/010-profile-levels.sql',import.meta.url),'utf8'));
 const admin='11111111-1111-4111-8111-111111111111',collector='22222222-2222-4222-8222-222222222222',creditor='33333333-3333-4333-8333-333333333333',other='44444444-4444-4444-8444-444444444444';
 const tenant='00000000-0000-0000-0000-000000000000',t2='55555555-5555-4555-8555-555555555555';
 await db.exec(`insert into auth.users(id) values('${admin}'),('${collector}'),('${creditor}'),('${other}');insert into public.cobranca_tenants(id,name) values('${t2}','Segundo tenant');insert into public.cobranca_profiles(id,tenant_id,name,role,discount_limit) values('${admin}','${tenant}','Admin','admin',100),('${collector}','${tenant}','Operador','collector',10),('${other}','${t2}','Outro','admin',100);`);
@@ -161,6 +162,31 @@ await as(admin);
 await rpc('team',{operation:'save',id:creditor,name:clientRow.name,role:'creditor',creditor_id:c,discount_limit:'0',active:true,client_access:{processes:false}});
 await as(creditor);await assert.rejects(()=>rpc('processes'));await assert.rejects(()=>rpc('detail',{id:d.id}));assert.equal((await rpc('lookups')).debtors.length,0);
 console.log('PASS: client permissions grant/revoke, hidden detail arrays, forged permission rejection and restricted reports.');
+
+
+// Manager delegation never permits role escalation or another-company administration.
+const manager='abababab-abab-4bab-8bab-abababababab';
+await db.exec(`reset role;insert into auth.users(id,email,email_confirmed_at) values('${manager}','manager@example.invalid',now());insert into public.cobranca_profiles(id,tenant_id,name,role,discount_limit) values('${manager}','${tenant}','Gestor teste','supervisor',15);`);
+await as(manager);await assert.rejects(()=>rpc('team',{operation:'list'}));
+await as(admin);await rpc('team',{operation:'save',id:manager,name:'Gestor autorizado',role:'supervisor',discount_limit:'15',active:true,can_manage_users:true});
+await as(manager);assert.ok((await rpc('team',{operation:'list'})).rows.length>0);
+const delegatedInvite=await rpc('team',{operation:'save',name:'Negociador do gestor',email:'delegated@example.invalid',role:'collector',discount_limit:'10',active:true});
+assert.ok((await rpc('team',{operation:'list'})).rows.some(x=>x.id===delegatedInvite.id));
+for(const payload of [{role:'admin',discount_limit:'10'},{role:'supervisor',discount_limit:'10'},{role:'collector',discount_limit:'16'},{role:'collector',discount_limit:'10',can_manage_users:true}])await assert.rejects(()=>rpc('team',{operation:'save',name:'Escalação',email:'escalation@example.invalid',active:true,...payload}));
+await assert.rejects(()=>rpc('team',{operation:'save',id:admin,name:'Admin edit',role:'collector',discount_limit:'10',active:true}));
+await assert.rejects(()=>rpc('team',{operation:'save',id:other,name:'Outra empresa',role:'collector',discount_limit:'10',active:true}));
+await assert.rejects(()=>rpc('payment',{id:d.id,amount:'1',reference:'MANAGER-BLOCK',paid_date:'2026-01-02',reason:'Não financeiro'}));
+await as(admin);await rpc('team',{operation:'save',id:manager,name:'Gestor sem delegação',role:'supervisor',discount_limit:'15',active:true,can_manage_users:false});await as(manager);await assert.rejects(()=>rpc('team',{operation:'list'}));
+await as(collector);
+for(const report of ['Recebimentos','Financeiro','Honorários e Repasses','E-mail de Clientes','Clientes Inativos'])await assert.rejects(()=>rpc('report',{report}));
+assert.equal((await rpc('report',{report:'Painel gerencial'})).metrics.fees,undefined);
+await assert.rejects(()=>rpc('save',{entity:'appointments',name:'Agenda de outro',due_at:'2026-10-10T12:00',assigned_to:admin,priority:'Normal',status:'Aberto'}));
+await as(admin);
+const invisibleCreditor=(await rpc('save',{entity:'creditors',name:'Carteira não atribuída',fee_percent:'0'})).id;
+const invisibleDebtor=(await rpc('save',{entity:'debtors',name:'Devedor não atribuído',creditor_id:invisibleCreditor})).id;
+const invisibleDebt=await rpc('new_process',{external_ref:'NOT-ASSIGNED',creditor_id:invisibleCreditor,debtor_id:invisibleDebtor,assigned_to:admin,original_amount:'50',due_date:'2026-01-01',interest_percent:'0',fine_percent:'0'});
+await as(collector);assert.equal((await rpc('processes',{filters:{process:'NOT-ASSIGNED'}})).count,0);await assert.rejects(()=>rpc('detail',{id:invisibleDebt.id}));assert.equal((await rpc('lookups')).creditors.some(x=>x.id===invisibleCreditor),false);await assert.rejects(()=>rpc('agreement',{id:d.id,discount_percent:'11',down_payment:'0',installments:'1',first_due_date:'2026-10-10',reason:'Desconto acima da alçada'}));
+console.log('PASS: manager delegation/revocation, role escalation blocked, negotiator assigned portfolio and discount limits.');
 
 await db.exec('reset role');const audit=await db.query('select count(*) n from public.cobranca_audit_logs');assert.ok(Number(audit.rows[0].n)>=7);
 console.log('PASS: migrations, CRUD, filtros, histórico, acordo, centavos, pagamento parcial, duplicidade, excesso, estorno, permissões, isolamento, auditoria.');
