@@ -11,6 +11,8 @@ await db.exec(await readFile(new URL('../database/003-admin-onboarding.sql',impo
 await db.exec(await readFile(new URL('../database/004-explicit-deny-policies.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/005-report-details.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/006-security-validation.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/007-contract-charges.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/008-company-members.sql',import.meta.url),'utf8'));
 const admin='11111111-1111-4111-8111-111111111111',collector='22222222-2222-4222-8222-222222222222',creditor='33333333-3333-4333-8333-333333333333',other='44444444-4444-4444-8444-444444444444';
 const tenant='00000000-0000-0000-0000-000000000000',t2='55555555-5555-4555-8555-555555555555';
 await db.exec(`insert into auth.users(id) values('${admin}'),('${collector}'),('${creditor}'),('${other}');insert into public.cobranca_tenants(id,name) values('${t2}','Segundo tenant');insert into public.cobranca_profiles(id,tenant_id,name,role,discount_limit) values('${admin}','${tenant}','Admin','admin',100),('${collector}','${tenant}','Operador','collector',10),('${other}','${t2}','Outro','admin',100);`);
@@ -84,6 +86,56 @@ for(const [action,payload] of [
 ])await assert.rejects(()=>rpc(action,payload),action+' crossed tenants');
 await as(admin);assert.equal((await rpc('get',{entity:'creditors',id:c})).name,'Credor teste');assert.equal(Number((await rpc('detail',{id:d.id})).process.current_amount),100);
 
+
+// Contract interest, fine, grace, partial cash allocation, reversal and snapshots.
+const charged=await rpc('new_process',{external_ref:'CHARGES-001',creditor_id:c,debtor_id:b,assigned_to:collector,original_amount:'1000.00',due_date:'2026-01-01',interest_percent:'3',fine_percent:'2',financial_mode:'monthly',grace_days:'0',contract_ref:'CONTRACT-A',financial_frozen:true});
+let q=await rpc('quote',{id:charged.id,as_of:'2026-01-31'});assert.equal(Number(q.principal),1000);assert.equal(Number(q.interest),30);assert.equal(Number(q.fine),20);assert.equal(Number(q.total),1050);assert.equal(q.frozen,false);
+await rpc('payment',{id:charged.id,amount:'550',reference:'CHARGES-P1',paid_date:'2026-01-31',reason:'Contract payment'});
+q=await rpc('quote',{id:charged.id,as_of:'2026-03-02'});assert.equal(Number(q.principal),500);assert.equal(Number(q.interest),15);assert.equal(Number(q.fine),0);assert.equal(Number(q.total),515);
+const chargeReceipt=(await rpc('report',{report:'Recebimentos'})).rows.find(x=>x.reference==='CHARGES-P1');assert.equal(Number(chargeReceipt.fee_amount),55);assert.equal(Number(chargeReceipt.calculation.interest),30);
+await assert.rejects(()=>rpc('contract',{id:charged.id,contract_ref:'CHANGE',financial_mode:'daily',interest_percent:'1',fine_percent:'2',grace_days:'0'}));
+await rpc('reverse',{id:charged.id,receipt_id:chargeReceipt.id,reason:'Correction'});q=await rpc('quote',{id:charged.id,as_of:'2026-03-02'});assert.equal(Number(q.interest),60);assert.equal(Number(q.fine),20);assert.equal(Number(q.total),1080);
+const daily=await rpc('new_process',{external_ref:'CHARGES-DAILY',creditor_id:c,debtor_id:b,assigned_to:collector,original_amount:'100.00',due_date:'2026-01-01',interest_percent:'0.1',fine_percent:'2',financial_mode:'daily',grace_days:'5',contract_ref:'CONTRACT-B'});
+q=await rpc('quote',{id:daily.id,as_of:'2026-01-06'});assert.equal(Number(q.total),100);
+q=await rpc('quote',{id:daily.id,as_of:'2026-01-16'});assert.equal(Number(q.interest),1);assert.equal(Number(q.fine),2);assert.equal(Number(q.total),103);
+await rpc('contract',{id:daily.id,contract_ref:'CONTRACT-B-CORRECTED',financial_mode:'monthly',interest_percent:'1',fine_percent:'0',grace_days:'0'});q=await rpc('quote',{id:daily.id,as_of:'2026-01-31'});assert.equal(Number(q.total),101);
+await assert.rejects(()=>rpc('payment',{id:daily.id,amount:'0.001',reference:'BAD-CENTS',paid_date:'2026-01-31',reason:'Invalid precision'}));
+const beforeAgreement=await rpc('quote',{id:daily.id});await rpc('agreement',{id:daily.id,discount_percent:'10',down_payment:'0',installments:'3',first_due_date:'2026-10-10',reason:'Contract settlement'});
+q=await rpc('quote',{id:daily.id});assert.equal(q.frozen,true);assert.equal(Number(q.total),Math.round(Number(beforeAgreement.total)*90)/100);
+await as(other);await assert.rejects(()=>rpc('quote',{id:daily.id}));await assert.rejects(()=>rpc('contract',{id:daily.id,contract_ref:'Attack',financial_mode:'none',interest_percent:'0',fine_percent:'0',grace_days:'0'}));await as(admin);
+
+
+const staff='77777777-7777-4777-8777-777777777777',founder='88888888-8888-4888-8888-888888888888';
+await db.exec(`reset role;insert into auth.users(id,email,email_confirmed_at) values('${staff}','staff@example.invalid',null),('${founder}','founder@example.invalid',now());`);await as(admin);
+const invitation=await rpc('team',{operation:'save',name:'Staff',email:'staff@example.invalid',role:'collector',discount_limit:'5',active:'true'});
+assert.ok((await rpc('team',{operation:'list'})).rows.some(x=>x.id===invitation.id));
+await as(other);assert.ok(!(await rpc('team',{operation:'list'})).rows.some(x=>x.id===invitation.id));
+await assert.rejects(()=>rpc('team',{operation:'save',id:collector,name:'Attack',role:'admin',discount_limit:'100',active:'true'}));
+await assert.rejects(()=>rpc('team',{operation:'save',id:invitation.id,invitation:true,email:'staff@example.invalid',name:'Attack',role:'admin',discount_limit:'100',active:'true'}));
+await as(staff);await assert.rejects(()=>db.query("select public.cobranca_membership('claim','{}')"));
+await db.exec(`reset role;update auth.users set email_confirmed_at=now() where id='${staff}';`);await as(staff);
+assert.equal((await db.query("select public.cobranca_membership('claim','{}') result")).rows[0].result.ready,true);assert.equal((await rpc('profile')).role,'collector');
+await assert.rejects(()=>rpc('team',{operation:'list'}));await assert.rejects(()=>rpc('team',{operation:'save',name:'Escalation',email:'evil@example.invalid',role:'admin',discount_limit:'100'}));
+await as(founder);assert.equal((await db.query("select public.cobranca_membership('claim','{}') result")).rows[0].result.ready,false);
+await db.query("select public.cobranca_membership('create_company',$1)",[JSON.stringify({name:'Independent company',tenant_id:tenant,role:'master'})]);
+const own=await rpc('profile');assert.notEqual(own.tenant_id,tenant);assert.notEqual(own.tenant_id,t2);assert.equal(own.role,'admin');assert.equal((await rpc('processes')).count,0);await assert.rejects(()=>rpc('detail',{id:d.id}));
+await as(admin);await assert.rejects(()=>rpc('team',{operation:'save',id:admin,name:'Self',role:'collector',discount_limit:'0',active:'true'}));
+await rpc('team',{operation:'save',id:staff,name:'Staff inactive',role:'collector',discount_limit:'5',active:'false'});await as(staff);await assert.rejects(()=>rpc('processes'));await assert.rejects(()=>db.query("select public.cobranca_membership('claim','{}')"));await as(admin);
+
+
+await rpc('save',{entity:'creditors',id:c,name:'Credor teste',fee_percent:'10',group:'FILTER-GROUP'});
+await rpc('save',{entity:'debtors',id:b,name:'Devedor teste',creditor_id:c,phone:'(11) 98765-4321'});
+const fd=await rpc('new_process',{external_ref:'P-FILTER',creditor_id:c,debtor_id:b,assigned_to:collector,original_amount:'200.00',due_date:'2026-01-01',interest_percent:'0',fine_percent:'0',commercial:'FILTER-COM',carrier:'FILTER-PORT',return_reason:'FILTER-REASON'});
+await rpc('payment',{id:fd.id,amount:'10',reference:'FILTER-PAY',paid_date:'2026-01-02',reason:'Filter receipt'});
+const today=(await db.query('select current_date::text as date_value')).rows[0].date_value;
+for(const [key,value] of Object.entries({search:'P-FILTER',process:'P-FILTER',creditor_id:c,debtor:'Devedor teste',client_code:c,group:'FILTER-GROUP',commercial:'FILTER-COM',carrier:'FILTER-PORT',assigned_to:collector,start:today,end:today,min:'190',max:'190',status:'Parcialmente pago',scope:'Abertos',payment_start:'2026-01-02',payment_end:'2026-01-02',overdue_min:'0',overdue_max:'99999',phone:'98765',return_reason:'FILTER-REASON',inactive_days:'0'})){
+ const rows=await rpc('processes',{filters:{process:'P-FILTER',[key]:value}});assert.ok(rows.rows.some(x=>x.id===fd.id),'filter failed: '+key);
+}
+for(const [key,value] of Object.entries({search:'MISSING',process:'MISSING',creditor_id:t2,debtor:'MISSING',client_code:'MISSING',group:'MISSING',commercial:'MISSING',carrier:'MISSING',assigned_to:other,start:'2099-01-01',end:'1900-01-01',min:'191',max:'189',status:'Suspenso',scope:'Encerrados',payment_start:'2026-01-03',payment_end:'2026-01-01',overdue_min:'99999',overdue_max:'0',phone:'000000',return_reason:'MISSING',inactive_days:'1'})){
+ assert.equal((await rpc('processes',{filters:{process:'P-FILTER',[key]:value}})).count,0,'nonmatching filter failed: '+key);
+}
+
 await db.exec('reset role');const audit=await db.query('select count(*) n from public.cobranca_audit_logs');assert.ok(Number(audit.rows[0].n)>=7);
 console.log('PASS: migrations, CRUD, filtros, histórico, acordo, centavos, pagamento parcial, duplicidade, excesso, estorno, permissões, isolamento, auditoria.');
 await db.close();
+

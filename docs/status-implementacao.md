@@ -28,9 +28,9 @@ Não é apresentado como SaaS completo ou homologado para produção.
 - Publicação do frontend e teste completo de Supabase Auth após o usuário criar
   sua senha e confirmar o e-mail. O banco separado indicado já está conectado;
   esquema e regras financeiras foram testados no PostgreSQL hospedado.
-- Provisionamento de usuários e portal credor com navegação dedicada.
+- Navegação dedicada para o portal credor. A autorização de usuários por empresa e perfil já foi implementada.
 - Todos os campos extensivos de cadastro, múltiplos contatos/endereços/títulos.
-- Juros/multa auditáveis: taxas são cadastradas, mas não aplicadas automaticamente.
+- Regras além de juros simples mensais (30 dias) ou diários: capitalização e índices de correção não estão implementados.
 - Aprovação de propostas, aceite documental e renegociações de acordo ativo.
 - Tratamento programado de parcelas vencidas e quebra de acordos.
 - Comissões, repasses efetivamente executados, conciliação e categorias completas.
@@ -45,3 +45,11 @@ Não é apresentado como SaaS completo ou homologado para produção.
 
 O workflow n8n original foi preservado e não ativado. Ele necessita avaliação e
 configuração antes de qualquer envio externo.
+
+## Auditoria de 10/10/2026
+
+Implementados: regras contratuais por cliente e processo, memória de juros/multa, recebimento com cálculo registrado, bloqueio de alteração de contrato após movimentos, usuários por convite com e-mail confirmado, cadastro de empresa com tenant independente, desativação de acessos e proteção da sessão contra respostas de sessão anterior.
+
+Passaram: seis testes monetários, suite PostgreSQL com migrações 001 a 008, todos os filtros com correspondência e exclusão, isolamento em consulta/edição/documentos/recebimentos, onboarding e permissões; suite de telas com cadastros, módulos, relatórios, exportação, acordo, documento/download, estorno, encargos e cinco resoluções. O teste local substitui o Supabase Auth por uma fixture. No banco hospedado, o teste de encargos/recebimento/estorno passou em transação revertida.
+
+Ainda não homologado para produção: login e fluxo de telas com conta real; certificado do domínio financeiro; recomendação do Supabase para proteção contra senhas vazadas; rotina de backup e restauração. A auditoria dos recursos disponíveis não completa automaticamente todas as integrações do prompt original.

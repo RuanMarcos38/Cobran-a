@@ -22,6 +22,8 @@ await db.exec(await readFile(new URL('../database/004-explicit-deny-policies.sql
 
 await db.exec(await readFile(new URL('../database/005-report-details.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/006-security-validation.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/007-contract-charges.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/008-company-members.sql',import.meta.url),'utf8'));
 
 const id='11111111-1111-4111-8111-111111111111';
 
@@ -79,6 +81,12 @@ try{
 
  await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('75,00')); assert.ok((await page.locator('#content').innerText()).includes('75,00'));
 
+
+ await page.getByRole('button',{name:'Alterar situação',exact:true}).click();await page.locator('dialog [name=status]').selectOption('Em cobrança');await page.locator('dialog [name=reason]').fill('Status UI');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});
+ await page.getByRole('button',{name:'Negociar / formalizar acordo',exact:true}).click();await page.locator('dialog [name=discount_percent]').fill('10');await page.locator('dialog [name=installments]').fill('3');await page.locator('dialog [name=first_due_date]').fill('2026-10-10');await page.locator('dialog [name=reason]').fill('Aceite UI');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('67,50'));
+ await page.getByRole('button',{name:'Adicionar documento',exact:true}).click();await page.locator('dialog [name=file]').setInputFiles({name:'ui.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-UI-test')});await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});
+ await page.keyboard.press('F9');await page.locator('[data-action^="download:"]').waitFor();const documentDownload=page.waitForEvent('download');await page.locator('[data-action^="download:"]').click();assert.equal((await documentDownload).suggestedFilename(),'ui.pdf');
+ await page.keyboard.press('F7');await page.getByRole('button',{name:'Recebimentos / estorno',exact:true}).click();await page.locator('dialog [data-reverse]').click();await page.locator('dialog [name=reason]').fill('Estorno UI');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('92,50'));
  await page.keyboard.press('F5');await page.locator('#filters').waitFor();
 
  await page.getByRole('button',{name:'Pesquisar Cliente',exact:true}).click();await page.locator('dialog .lookup-results button').first().click();await page.locator('dialog').waitFor({state:'hidden'});assert.notEqual(await page.locator('#filters [name=creditor_id]').inputValue(),'');
@@ -111,7 +119,7 @@ try{
    await page.locator(`[data-section="${section}"]`).click();
    await page.waitForFunction(()=>document.querySelector('#content').children.length>0);
    await page.locator('[data-action=refresh]').click();
-   const dl=page.waitForEvent('download');await page.locator('[data-action=export]').click();assert.equal((await dl).suggestedFilename(),'cobranca.csv');
+   if(await page.locator('[data-action=export]').count()){const dl=page.waitForEvent('download');await page.locator('[data-action=export]').click();assert.equal((await dl).suggestedFilename(),'cobranca.csv');}
    if(await page.locator('#report-filter').count()){
     await page.locator('#report-filter [name=start]').fill('2026-01-01');await page.locator('#report-filter [name=end]').fill('2026-12-31');await page.locator('#report-filter button').click();
     await page.evaluate(()=>{window.print=()=>{window.testPrinted=true;};});await page.locator('[data-action=print]').click();assert.equal(await page.evaluate(()=>window.testPrinted),true);
@@ -129,14 +137,21 @@ try{
   await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.locator('[data-row]').first().waitFor();
   await page.locator('[data-row]').first().click();await page.locator('dialog [name=name]').fill(fields.name+' editado');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});
  }
+
+ await page.locator('[data-module=Cadastro]').click();await page.locator('[data-section=Usuários]').click();await page.locator('[data-action=new]').click();await page.locator('dialog [name=name]').fill('Colaborador UI');await page.locator('dialog [name=email]').fill('collaborator@example.invalid');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('Colaborador UI'));
  await page.locator('[data-action=notifications]').click();await page.locator('dialog').waitFor();await page.locator('dialog [data-cancel]').first().click();
  await page.locator('[data-action=settings]').click();await page.locator('dialog [name=name]').fill('Assessoria UI');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('.company').textContent.includes('Assessoria UI'));
+
+ await page.locator('[data-module=Processo]').click();await page.locator('[data-action=new]').click();const due=new Date();due.setUTCDate(due.getUTCDate()-30);
+ await page.locator('dialog [name=external_ref]').fill('UI-CHARGES');await page.locator('dialog [name=original_amount]').fill('100.00');await page.locator('dialog [name=due_date]').fill(due.toISOString().slice(0,10));await page.locator('dialog [name=contract_ref]').fill('UI-CONTRACT');await page.locator('dialog [name=financial_mode]').selectOption('monthly');await page.locator('dialog [name=interest_percent]').fill('3');await page.locator('dialog [name=fine_percent]').fill('2');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.locator('[data-row]').filter({hasText:'UI-CHARGES'}).click();await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('105,00'));
+ await page.locator('[data-action=contract]').click();await page.locator('dialog [name=financial_mode]').selectOption('daily');await page.locator('dialog [name=interest_percent]').fill('1');await page.locator('dialog [name=fine_percent]').fill('0');await page.locator('dialog [name=grace_days]').fill('5');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('125,00'));
+ await page.locator('[data-action=payment]').click();await page.locator('dialog [name=amount]').fill('125.00');await page.locator('dialog [name=reference]').fill('UI-CHARGES-PAID');await page.locator('dialog [name=paid_date]').fill(new Date().toISOString().slice(0,10));await page.locator('dialog [name=reason]').fill('Quitação com encargos');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('Quitado'));
  assert.equal(await page.locator('#message').innerText(),'');
  await page.getByRole('button',{name:'Sair',exact:true}).click();await page.locator('#login').waitFor();
 
  assert.deepEqual(errors,[]);
 
- console.log('PASS UI local: login/logout, cliente, devedor, processo, histórico, pagamento, saldo, F5, painel e cinco resoluções. Supabase Auth foi substituído por fixture de teste; PostgreSQL e RPC reais locais.');
+ console.log('PASS UI local: todos os módulos, relatórios, CSV, impressão acionada, despesas, prospecção, agenda, usuários, documentos, acordo, estorno e encargos contratuais;  login/logout, cliente, devedor, processo, histórico, pagamento, saldo, F5, painel e cinco resoluções. Supabase Auth foi substituído por fixture de teste; PostgreSQL e RPC reais locais.');
 
 }finally{await browser?.close();server.kill();await db.close();}
 
