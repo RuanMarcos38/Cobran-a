@@ -19,3 +19,9 @@ export async function rpc(action,payload={}){
   if(session&&session.expires_at<Date.now()/1000+60){session=await request('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:session.refresh_token})});sessionStorage.setItem('cobranca_session',JSON.stringify(session));}
   return request('/rest/v1/rpc/cobranca_app',{method:'POST',body:JSON.stringify({action,payload})});
 }
+
+export async function server(operation,payload={}){
+ await rpc('profile');const epoch=sessionEpoch;
+ const r=await fetch('/api/v1/'+operation,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify(payload)});const data=await r.json();
+ if(epoch!==sessionEpoch)throw Error('A sessão foi alterada. Entre novamente.');if(!r.ok)throw Error(data.error||'Operação rejeitada');return data.data;
+}

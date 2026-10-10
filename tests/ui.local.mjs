@@ -29,6 +29,7 @@ await db.exec(await readFile(new URL('../database/010-profile-levels.sql',import
 await db.exec(await readFile(new URL('../database/011-sectors-api.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/012-private-sector-policies.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/013-financial-ledger-erp.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/014-chat-reports.sql',import.meta.url),'utf8'));
 
 const id='11111111-1111-4111-8111-111111111111';
 
@@ -42,7 +43,7 @@ try{
 
  for(let i=0;i<30;i++){try{await fetch('http://127.0.0.1:3010/config');break;}catch{await new Promise(r=>setTimeout(r,100));}}
 
- browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+ browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,args:['--use-fake-ui-for-media-stream','--use-fake-device-for-media-stream']});
 
  const page=await browser.newPage({viewport:{width:1366,height:768}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
 
@@ -179,8 +180,17 @@ try{
  await page.locator('[data-move]').first().selectOption('Negociação');await page.locator('.kanban-column').filter({has:page.getByRole('heading',{name:'Negociação'})}).getByText('Oportunidade CRM UI',{exact:true}).waitFor();
  await page.locator('[data-sector^="attend:"]').first().click();await page.locator('dialog [name=subject]').fill('Contato de teste');await page.locator('dialog [name=content]').fill('Registro de atendimento');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});
  await page.locator('[data-sector^="attend:"]').first().click();await page.getByText('Registro de atendimento',{exact:true}).waitFor();await page.locator('dialog [data-cancel]').first().click();
+
+ await page.route('http://127.0.0.1:3010/api/v1/whatsapp_status',route=>route.fulfill({json:{data:{ready:false,state:'not_configured'}}}));
+ await page.locator('[data-section=Atendimento]').click();await page.locator('[data-chat-id]').first().click();await page.getByLabel('Mensagem',{exact:true}).fill('Olá');await page.getByRole('button',{name:'Escolher emoji'}).click();await page.getByRole('button',{name:'Inserir 😀',exact:true}).click();assert.equal(await page.getByLabel('Mensagem',{exact:true}).inputValue(),'Olá😀');await page.getByRole('button',{name:'Salvar mensagem',exact:true}).click();await page.getByText('Olá😀',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Enviar pelo WhatsApp',exact:true}).isEnabled(),false);
+ await page.getByLabel('Selecionar anexo').setInputFiles({name:'atendimento.txt',mimeType:'text/plain',buffer:Buffer.from('arquivo confidencial de teste')});await page.getByRole('button',{name:'Salvar mensagem',exact:true}).click();await page.getByRole('button',{name:/Baixar arquivo.*atendimento.txt/}).waitFor();const chatDownload=page.waitForEvent('download');await page.getByRole('button',{name:/Baixar arquivo.*atendimento.txt/}).click();assert.equal((await chatDownload).suggestedFilename(),'atendimento.txt');
+ await page.getByLabel('Selecionar anexo').setInputFiles({name:'remover.txt',mimeType:'text/plain',buffer:Buffer.from('remover')});await page.getByRole('button',{name:'Remover anexo',exact:true}).click();assert.equal(await page.locator('.chat-attachment-name').textContent(),'');
+ await page.getByRole('button',{name:'Gravar áudio',exact:false}).click();await page.getByRole('button',{name:'Parar gravação',exact:false}).waitFor();await page.waitForTimeout(500);await page.getByRole('button',{name:'Parar gravação',exact:false}).click();await page.locator('.chat-attachment-name').filter({hasText:'.webm'}).waitFor();await page.getByRole('button',{name:'Salvar mensagem',exact:true}).click();await page.getByRole('button',{name:/Ouvir áudio/}).waitFor();await page.getByRole('button',{name:/Ouvir áudio/}).click();await page.locator('audio').waitFor();await page.waitForFunction(()=>document.querySelector('audio').readyState>=1);assert.ok(await page.locator('audio').evaluate(a=>a.duration>0));
+ await page.locator('[data-chat-refresh]').click();await page.getByText('Olá😀',{exact:true}).waitFor();await page.getByLabel('Pesquisar conversas').fill('inexistente');assert.equal(await page.locator('[data-chat-id]:visible').count(),0);await page.getByLabel('Pesquisar conversas').fill('');
+ await page.getByRole('button',{name:'Usar tema escuro',exact:true}).click();assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');await page.reload();await page.locator('[data-theme-toggle]').waitFor();assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');await page.getByRole('button',{name:'Usar tema claro',exact:true}).click();assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+ console.log('PASS attendance UI: emoji, file download/removal, real browser audio recording/playback, search, refresh, disconnected WhatsApp blocked, persisted dark/light theme.');
  await page.locator('[data-section=Agendamentos]').click();await page.locator('[data-sector=new]').click();await page.locator('dialog [name=name]').fill('Agenda CRM UI');await page.locator('dialog [name=due_at]').fill('2026-10-20T10:00');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Agenda CRM UI',{exact:true}).waitFor();
- for(const section of ['Funil / Kanban','Atendimento','Comissões comerciais']){await page.locator(`[data-section="${section}"]`).click();await page.locator('[data-sector=refresh]').waitFor();await page.locator('[data-sector=refresh]').click();}
+ for(const section of ['Funil / Kanban','Atendimento','Comissões comerciais']){await page.locator(`[data-section="${section}"]`).click();await page.locator('[data-sector=refresh],[data-chat-refresh]').waitFor();await page.locator('[data-sector=refresh],[data-chat-refresh]').click();}
  await page.locator('[data-action=notifications]').click();await page.getByRole('heading',{name:'Pendências operacionais'}).waitFor();await page.locator('dialog [data-cancel]').first().click();await page.keyboard.press('F7');assert.equal(await page.locator('[data-module=Processo]').count(),0);
  await page.setViewportSize({width:390,height:844});await page.locator('[data-action=menu]').click();await page.locator('[data-section="Funil / Kanban"]').click();assert.equal(await page.evaluate(()=>document.body.classList.contains('menu-open')),false);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.locator('[data-sector=refresh]').waitFor();await page.setViewportSize({width:1366,height:768});
  await page.getByRole('button',{name:'Sair',exact:true}).click();await page.locator('#login').waitFor();

@@ -1,3 +1,4 @@
+import {handleWhatsapp} from './evolution.mjs';
 import {readFile} from 'node:fs/promises';
 const limits=new Map();
 export async function handleApi(req,res,env=process.env){
@@ -13,5 +14,9 @@ export async function handleApi(req,res,env=process.env){
  const operation=url.pathname.split('/').at(-1),bordero=['borderos','erp_sync'].includes(operation);const authorization=req.headers.authorization;
  if(bordero&&!req.headers['x-integration-key']){send(401,{error:'Informe X-Integration-Key'});return true;}
  if(!bordero&&!/^Bearer [A-Za-z0-9._-]+$/.test(authorization||'')){send(401,{error:'Autenticação Bearer obrigatória'});return true;}
+ if(['whatsapp_status','whatsapp_send'].includes(operation)){
+  const rpc=async(action,payload)=>{const r=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/cobranca_app',{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:authorization,'Content-Type':'application/json'},body:JSON.stringify({action,payload}),signal:AbortSignal.timeout(20000)});const d=await r.json();if(!r.ok)throw Error(d.message||'Acesso não autorizado');return d;};
+  try{send(200,{data:await handleWhatsapp(operation,body,rpc,env)});}catch(e){send(400,{error:e.message});}return true;
+ }
  try{const upstream=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/'+(operation==='erp_sync'?'cobranca_erp_sync':bordero?'cobranca_bordero':'cobranca_app'),{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json',...(bordero?{}:{Authorization:authorization})},body:JSON.stringify(bordero?{token:req.headers['x-integration-key'],payload:body}:{action:operation,payload:body}),signal:AbortSignal.timeout(20000)});const data=await upstream.json();send(upstream.ok?200:upstream.status,{...(upstream.ok?{data}:{error:data.message||'Solicitação rejeitada'})});}catch{send(502,{error:'Não foi possível acessar o backend'});}return true;
 }
