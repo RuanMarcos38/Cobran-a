@@ -21,6 +21,7 @@ await db.exec(await readFile(new URL('../database/003-admin-onboarding.sql',impo
 await db.exec(await readFile(new URL('../database/004-explicit-deny-policies.sql',import.meta.url),'utf8'));
 
 await db.exec(await readFile(new URL('../database/005-report-details.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/006-security-validation.sql',import.meta.url),'utf8'));
 
 const id='11111111-1111-4111-8111-111111111111';
 
@@ -100,6 +101,37 @@ try{
 
  await page.locator('[data-module=Relatórios]').click();await page.locator('.metrics').waitFor();
 
+
+ // Exercise every published navigation entry and report button against the local database.
+ await page.setViewportSize({width:1366,height:768});
+ for(const module of ['Cadastro','Processo','Financeiro','Comercial','Relatórios']){
+  await page.locator(`[data-module="${module}"]`).click();
+  const sections=await page.locator('[data-section]').evaluateAll(nodes=>nodes.map(n=>n.dataset.section));
+  for(const section of sections){
+   await page.locator(`[data-section="${section}"]`).click();
+   await page.waitForFunction(()=>document.querySelector('#content').children.length>0);
+   await page.locator('[data-action=refresh]').click();
+   const dl=page.waitForEvent('download');await page.locator('[data-action=export]').click();assert.equal((await dl).suggestedFilename(),'cobranca.csv');
+   if(await page.locator('#report-filter').count()){
+    await page.locator('#report-filter [name=start]').fill('2026-01-01');await page.locator('#report-filter [name=end]').fill('2026-12-31');await page.locator('#report-filter button').click();
+    await page.evaluate(()=>{window.print=()=>{window.testPrinted=true;};});await page.locator('[data-action=print]').click();assert.equal(await page.evaluate(()=>window.testPrinted),true);
+   }
+  }
+ }
+ for(const [module,section,fields] of [
+  ['Cadastro','Cadastros auxiliares',{name:'Auxiliar UI'}],
+  ['Financeiro','Despesas',{name:'Despesa UI',amount:'30.00',due_date:'2026-10-10',category:'Operação'}],
+  ['Comercial','Prospecção',{name:'Prospect UI',document:'654321'}],
+  ['Comercial','Agendamentos',{name:'Agenda UI',due_at:'2026-10-12T10:00'}]
+ ]){
+  await page.locator(`[data-module="${module}"]`).click();await page.locator(`[data-section="${section}"]`).click();await page.locator('[data-action=new]').click();
+  for(const [name,value] of Object.entries(fields))await page.locator(`dialog [name="${name}"]`).fill(value);
+  await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.locator('[data-row]').first().waitFor();
+  await page.locator('[data-row]').first().click();await page.locator('dialog [name=name]').fill(fields.name+' editado');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});
+ }
+ await page.locator('[data-action=notifications]').click();await page.locator('dialog').waitFor();await page.locator('dialog [data-cancel]').first().click();
+ await page.locator('[data-action=settings]').click();await page.locator('dialog [name=name]').fill('Assessoria UI');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('.company').textContent.includes('Assessoria UI'));
+ assert.equal(await page.locator('#message').innerText(),'');
  await page.getByRole('button',{name:'Sair',exact:true}).click();await page.locator('#login').waitFor();
 
  assert.deepEqual(errors,[]);

@@ -10,6 +10,7 @@ await db.exec(await readFile(new URL('../database/002-app.sql',import.meta.url),
 await db.exec(await readFile(new URL('../database/003-admin-onboarding.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/004-explicit-deny-policies.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/005-report-details.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/006-security-validation.sql',import.meta.url),'utf8'));
 const admin='11111111-1111-4111-8111-111111111111',collector='22222222-2222-4222-8222-222222222222',creditor='33333333-3333-4333-8333-333333333333',other='44444444-4444-4444-8444-444444444444';
 const tenant='00000000-0000-0000-0000-000000000000',t2='55555555-5555-4555-8555-555555555555';
 await db.exec(`insert into auth.users(id) values('${admin}'),('${collector}'),('${creditor}'),('${other}');insert into public.cobranca_tenants(id,name) values('${t2}','Segundo tenant');insert into public.cobranca_profiles(id,tenant_id,name,role,discount_limit) values('${admin}','${tenant}','Admin','admin',100),('${collector}','${tenant}','Operador','collector',10),('${other}','${t2}','Outro','admin',100);`);
@@ -57,6 +58,32 @@ assert.equal((await rpc('list',{entity:'creditors'})).count,3);
 await assert.rejects(()=>rpc('document',{id:d.id,name:'fake.pdf',mime:'application/pdf',content:btoa('not pdf')}));
 await rpc('document',{id:d.id,name:'test.pdf',mime:'application/pdf',content:btoa('%PDF-test')});
 assert.equal((await rpc('detail',{id:d.id})).documents.length,1);
+
+// Forged identity fields never override server-owned identifiers.
+await rpc('save',{entity:'creditors',id:c,name:'Credor teste',fee_percent:'10',tenant_id:t2,role:'master',created_at:'1900-01-01'});
+const secure=await rpc('get',{entity:'creditors',id:c});assert.equal(secure.id,c);assert.equal(secure.tenant_id,tenant);assert.notEqual(secure.created_at,'1900-01-01');
+const c2=(await rpc('save',{entity:'creditors',name:'Segundo credor',fee_percent:'0'})).id;
+await assert.rejects(()=>rpc('save',{entity:'debtors',id:b,name:'Devedor teste',creditor_id:c2}));
+assert.equal((await rpc('get',{entity:'debtors',id:b})).creditor_id,c);
+await assert.rejects(()=>rpc('history',{id:d.id,channel:'promise',content:'Sem data'}));
+await assert.rejects(()=>rpc('agreement',{id:d.id,installments:'2',down_payment:'0',first_due_date:'2026-10-10',reason:'Sem desconto'}));
+await assert.rejects(()=>rpc('save',{entity:'creditors',name:'Taxa inválida',fee_percent:'101'}));
+await assert.rejects(()=>rpc('save',{entity:'expenses',name:'Despesa inválida',amount:'10',due_date:'2026-10-10',status:'inventado'}));
+await assert.rejects(()=>rpc('save',{entity:'leads',name:'Etapa inválida',stage:'inventado'}));
+const document=(await rpc('detail',{id:d.id})).documents[0];
+const expense=await rpc('save',{entity:'expenses',name:'Despesa sigilosa',amount:'10',due_date:'2026-10-10',status:'Pendente'});
+await as(other);
+for(const action of ['lookups','processes','report','notifications']){const data=await rpc(action,action==='report'?{report:'Recebimentos'}:{});const encoded=JSON.stringify(data);for(const secret of [c,b,d.id,'Credor teste','Devedor teste','Despesa sigilosa'])assert.ok(!encoded.includes(secret),action+' leaked '+secret);}
+for(const [action,payload] of [
+ ['get',{entity:'debtors',id:b}],['get',{entity:'expenses',id:expense.id}],['download',{id:document.id}],
+ ['save',{entity:'creditors',id:c,name:'Ataque',fee_percent:'0'}],['save',{entity:'debtors',id:b,name:'Ataque',creditor_id:c}],
+ ['status',{id:d.id,status:'Em cobrança',reason:'Ataque'}],['history',{id:d.id,channel:'human',content:'Ataque'}],
+ ['payment',{id:d.id,amount:'1',reference:'ATTACK',paid_date:'2026-10-10',reason:'Ataque'}],
+ ['reverse',{id:d.id,receipt_id:receipts.rows[0].id,reason:'Ataque'}],['distribute',{ids:[d.id],assigned_to:other,reason:'Ataque'}],
+ ['document',{id:d.id,name:'attack.pdf',mime:'application/pdf',content:btoa('%PDF-attack')}]
+])await assert.rejects(()=>rpc(action,payload),action+' crossed tenants');
+await as(admin);assert.equal((await rpc('get',{entity:'creditors',id:c})).name,'Credor teste');assert.equal(Number((await rpc('detail',{id:d.id})).process.current_amount),100);
+
 await db.exec('reset role');const audit=await db.query('select count(*) n from public.cobranca_audit_logs');assert.ok(Number(audit.rows[0].n)>=7);
 console.log('PASS: migrations, CRUD, filtros, histórico, acordo, centavos, pagamento parcial, duplicidade, excesso, estorno, permissões, isolamento, auditoria.');
 await db.close();
