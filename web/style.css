@@ -77,3 +77,8 @@ html[data-theme=dark] .sidebar button.active{background:#1768c2;color:white}
 html[data-theme=dark] a{color:#8dc0ff}
 @media(max-width:768px){.chat-layout{grid-template-columns:1fr}.chat-contacts{max-height:170px;border-right:0;border-bottom:1px solid var(--line)}.chat-messages{height:320px;padding:10px}.chat-bubble{max-width:100%}.chat-controls [type=submit]{width:100%;justify-content:center}.topbar [data-theme-toggle]{font-size:11px;padding:6px}.chat-file input{max-width:150px}}
 @media print{html[data-theme=dark],html[data-theme=dark] body,html[data-theme=dark] .app-main,html[data-theme=dark] :is(.workspace,.panel,.metric,.table-wrap,th,thead,td,tr){background:white!important;color:black!important;border-color:#aaa!important}[data-theme-toggle],.report-tools,.chat-compose{display:none!important}.metric{break-inside:avoid}}
+html[data-theme=dark] :is(h1,h2,h3,.metric strong,.sidebar-brand strong,.user-summary strong,.kanban-column h3,.opportunity strong){color:#e0e8f2}
+html[data-theme=dark] #global-search{background:#26364a;color:#e0e8f2;border-color:#4d6076}
+html[data-theme=dark] .footer{background:#182333;color:#e0e8f2;border-color:#39485c}
+html[data-theme=dark] :is(.detail-grid div,.history article,.crm-timeline article,.receipt,.lookup-results,.lookup-search,.lookup-results button){background:#1c2838;color:#e0e8f2;border-color:#39485c}
+@media print{html[data-theme=dark] :is(h1,h2,h3,.metric strong){color:black!important}}
