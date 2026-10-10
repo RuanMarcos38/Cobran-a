@@ -13,6 +13,7 @@ await db.exec(await readFile(new URL('../database/005-report-details.sql',import
 await db.exec(await readFile(new URL('../database/006-security-validation.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/007-contract-charges.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/008-company-members.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/009-client-access.sql',import.meta.url),'utf8'));
 const admin='11111111-1111-4111-8111-111111111111',collector='22222222-2222-4222-8222-222222222222',creditor='33333333-3333-4333-8333-333333333333',other='44444444-4444-4444-8444-444444444444';
 const tenant='00000000-0000-0000-0000-000000000000',t2='55555555-5555-4555-8555-555555555555';
 await db.exec(`insert into auth.users(id) values('${admin}'),('${collector}'),('${creditor}'),('${other}');insert into public.cobranca_tenants(id,name) values('${t2}','Segundo tenant');insert into public.cobranca_profiles(id,tenant_id,name,role,discount_limit) values('${admin}','${tenant}','Admin','admin',100),('${collector}','${tenant}','Operador','collector',10),('${other}','${t2}','Outro','admin',100);`);
@@ -134,6 +135,32 @@ for(const [key,value] of Object.entries({search:'P-FILTER',process:'P-FILTER',cr
 for(const [key,value] of Object.entries({search:'MISSING',process:'MISSING',creditor_id:t2,debtor:'MISSING',client_code:'MISSING',group:'MISSING',commercial:'MISSING',carrier:'MISSING',assigned_to:other,start:'2099-01-01',end:'1900-01-01',min:'191',max:'189',status:'Suspenso',scope:'Encerrados',payment_start:'2026-01-03',payment_end:'2026-01-01',overdue_min:'99999',overdue_max:'0',phone:'000000',return_reason:'MISSING',inactive_days:'1'})){
  assert.equal((await rpc('processes',{filters:{process:'P-FILTER',[key]:value}})).count,0,'nonmatching filter failed: '+key);
 }
+
+
+// Administrator-controlled client portal; permissions never widen ownership.
+await as(admin);
+let teamRows=(await rpc('team',{operation:'list'})).rows;
+let clientRow=teamRows.find(x=>x.id===creditor);
+const permit={processes:true,history:false,documents:false,receipts:false,reports:false,export:false};
+await rpc('team',{operation:'save',id:creditor,name:clientRow.name,role:'creditor',creditor_id:c,discount_limit:'0',active:true,client_access:permit});
+await as(creditor);
+assert.equal((await rpc('detail',{id:d.id})).history.length,0);
+assert.equal((await rpc('detail',{id:d.id})).documents.length,0);
+for(const [a,payload] of [['export',{entity:'processes'}],['report',{report:'Recebimentos'}],['report',{report:'Painel gerencial'}],['team',{operation:'list'}],['list',{entity:'creditors'}]])await assert.rejects(()=>rpc(a,payload));
+await assert.rejects(()=>rpc('team',{operation:'save',id:creditor,...permit}));
+await as(admin);
+await assert.rejects(()=>rpc('team',{operation:'save',id:creditor,name:clientRow.name,role:'creditor',creditor_id:c,discount_limit:'0',active:true,client_access:{evil:true}}));
+await rpc('team',{operation:'save',id:creditor,name:clientRow.name,role:'creditor',creditor_id:c,discount_limit:'0',active:true,client_access:Object.fromEntries(Object.keys(permit).map(k=>[k,true]))});
+const hiddenDebtor=(await rpc('save',{entity:'debtors',name:'Outro cliente restrito',creditor_id:c2})).id;
+const hiddenDebt=await rpc('new_process',{external_ref:'RESTRICTED-CLIENT',creditor_id:c2,debtor_id:hiddenDebtor,assigned_to:collector,original_amount:'10',due_date:'2026-01-01',interest_percent:'0',fine_percent:'0'});
+await rpc('document',{id:hiddenDebt.id,name:'restricted.pdf',mime:'application/pdf',content:btoa('%PDF-restricted')});
+const hiddenDoc=(await rpc('detail',{id:hiddenDebt.id})).documents[0];
+await as(creditor);await assert.rejects(()=>rpc('detail',{id:hiddenDebt.id}));await assert.rejects(()=>rpc('download',{id:hiddenDoc.id}));assert.equal((await rpc('processes',{filters:{process:'RESTRICTED-CLIENT'}})).count,0);assert.equal((await rpc('lookups')).debtors.some(x=>x.id===hiddenDebtor),false);assert.ok((await rpc('detail',{id:d.id})).history.length>0);await rpc('report',{report:'Recebimentos'});await rpc('export',{entity:'processes'});
+await assert.rejects(()=>rpc('report',{report:'Honorários e Repasses'}));
+await as(admin);
+await rpc('team',{operation:'save',id:creditor,name:clientRow.name,role:'creditor',creditor_id:c,discount_limit:'0',active:true,client_access:{processes:false}});
+await as(creditor);await assert.rejects(()=>rpc('processes'));await assert.rejects(()=>rpc('detail',{id:d.id}));assert.equal((await rpc('lookups')).debtors.length,0);
+console.log('PASS: client permissions grant/revoke, hidden detail arrays, forged permission rejection and restricted reports.');
 
 await db.exec('reset role');const audit=await db.query('select count(*) n from public.cobranca_audit_logs');assert.ok(Number(audit.rows[0].n)>=7);
 console.log('PASS: migrations, CRUD, filtros, histórico, acordo, centavos, pagamento parcial, duplicidade, excesso, estorno, permissões, isolamento, auditoria.');

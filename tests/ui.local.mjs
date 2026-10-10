@@ -24,6 +24,7 @@ await db.exec(await readFile(new URL('../database/005-report-details.sql',import
 await db.exec(await readFile(new URL('../database/006-security-validation.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/007-contract-charges.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/008-company-members.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/009-client-access.sql',import.meta.url),'utf8'));
 
 const id='11111111-1111-4111-8111-111111111111';
 
@@ -149,6 +150,16 @@ try{
  assert.equal(await page.locator('#message').innerText(),'');
  await page.getByRole('button',{name:'Sair',exact:true}).click();await page.locator('#login').waitFor();
 
+
+ // Restricted client menus and administrator-granted capabilities.
+ await db.exec(`reset role;update public.cobranca_profiles set role='creditor',creditor_id=(select id from public.cobranca_creditors where name='Credor UI' limit 1) where id='${id}';set role authenticated;`);
+ await page.locator('#login [name=email]').fill('test@example.invalid');await page.locator('#login [name=password]').fill('test-password');await page.getByRole('button',{name:'Entrar',exact:true}).click();await page.locator('#filters').waitFor();
+ for(const m of ['Cadastro','Financeiro','Comercial','Relatórios'])assert.equal(await page.locator(`[data-module="${m}"]`).count(),0);
+ assert.equal(await page.locator('[data-action=export]').count(),0);assert.equal(await page.locator('[data-tab="3"]').count(),0);assert.equal(await page.locator('[data-tab="4"]').count(),0);
+ await db.exec(`reset role;update public.cobranca_profiles set client_access='{"processes":true,"history":true,"documents":true,"receipts":true,"reports":true,"export":true}' where id='${id}';set role authenticated;`);await page.reload();await page.locator('#filters').waitFor();
+ assert.equal(await page.locator('[data-module=Relatórios]').count(),1);assert.equal(await page.locator('[data-action=export]').count(),1);assert.equal(await page.locator('[data-tab="4"]').count(),1);assert.equal(await page.locator('[data-module=Financeiro]').count(),0);
+ await db.exec(`reset role;update public.cobranca_profiles set client_access='{"processes":false,"history":false,"documents":false,"receipts":false,"reports":false,"export":false}' where id='${id}';set role authenticated;`);await page.reload();await page.getByText('Seu administrador ainda não liberou consultas para este acesso.').waitFor();assert.equal(await page.locator('[data-module]').count(),0);
+ console.log('PASS UI portal cliente: menus, tabs and export hidden until granted; all consultations revocable.');
  assert.deepEqual(errors,[]);
 
  console.log('PASS UI local: todos os módulos, relatórios, CSV, impressão acionada, despesas, prospecção, agenda, usuários, documentos, acordo, estorno e encargos contratuais;  login/logout, cliente, devedor, processo, histórico, pagamento, saldo, F5, painel e cinco resoluções. Supabase Auth foi substituído por fixture de teste; PostgreSQL e RPC reais locais.');

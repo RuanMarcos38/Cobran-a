@@ -28,7 +28,7 @@ Não é apresentado como SaaS completo ou homologado para produção.
 - Frontend publicado; falta teste completo de Supabase Auth após o usuário criar
   sua senha e confirmar o e-mail. O banco separado indicado já está conectado;
   esquema e regras financeiras foram testados no PostgreSQL hospedado.
-- Navegação dedicada para o portal credor. A autorização de usuários por empresa e perfil já foi implementada.
+- Portal credor implementado com navegação restrita e permissões liberadas por administrador; cada perfil permanece vinculado a um único cliente da sua empresa.
 - Todos os campos extensivos de cadastro, múltiplos contatos/endereços/títulos.
 - Regras além de juros simples mensais (30 dias) ou diários: capitalização e índices de correção não estão implementados.
 - Aprovação de propostas, aceite documental e renegociações de acordo ativo.
@@ -52,6 +52,13 @@ Implementados: regras contratuais por cliente e processo, memória de juros/mult
 
 Passaram: sete testes unitários (incluindo troca de sessão), suite PostgreSQL com migrações 001 a 008, todos os filtros com correspondência e exclusão, isolamento em consulta/edição/documentos/recebimentos, onboarding e permissões; suite de telas com cadastros, módulos, relatórios, exportação, acordo, documento/download, estorno, encargos e cinco resoluções. O teste local substitui o Supabase Auth por uma fixture. No banco hospedado, o teste de encargos/recebimento/estorno passou em transação revertida.
 
-Ainda não homologado para produção: login e fluxo de telas com conta real; certificado do domínio financeiro; recomendação do Supabase para proteção contra senhas vazadas; rotina de backup e restauração. A auditoria dos recursos disponíveis não completa automaticamente todas as integrações do prompt original.
+Ainda não homologado para produção: login e fluxo de telas com conta real; recomendação do Supabase para proteção contra senhas vazadas; rotina de backup e restauração. A auditoria dos recursos disponíveis não completa automaticamente todas as integrações do prompt original.
 
-Autenticação: mínimo de 12 caracteres, troca segura com senha atual e retorno para o endereço público seguro configurados. SMTP próprio não configurado; aguarda definição do provedor existente. Proteção contra senhas vazadas exige Pro e não foi contratada.
+Autenticação: mínimo de 12 caracteres, troca segura com senha atual e retorno para o endereço público seguro configurados. SMTP Hostinger configurado e requisição de envio de recuperação aceita (HTTP 200); entrega na caixa de entrada ainda precisa ser confirmada. Proteção contra senhas vazadas exige Pro e não foi contratada.
+
+
+## Atualização de segurança — 10/10/2026
+
+SSL do domínio financeiro.rrestrategiaperformance.com.br emitido por Let's Encrypt, verificado com validação TLS habilitada, vencimento 08/01/2027. Site URL do Auth atualizado para esse domínio. Somente a rota do serviço cobranca foi recriada, com autorização explícita do usuário; os outros serviços foram preservados.
+
+Migração 009: permissões de consulta por cliente (processos, histórico, documentos, recebimentos, relatórios e exportação), somente administradores da mesma empresa podem alterar. Permissões conservadoras por padrão: processos liberados, demais consultas bloqueadas. Perfil cliente não recebe permissão de escrita. Desativação do perfil revoga acesso. Toda consulta permanece submetida ao vínculo tenant/cliente; permissões não substituem ownership. Menus e atalhos seguem as permissões, e o backend rejeita chamadas diretas bloqueadas. Liberação/revogação, documento de outro cliente, relatórios internos e tentativa de alteração de permissão passaram no teste de banco. Portal restrito/liberado/sem consultas passou no teste de telas. O teste de telas usa fixture de autenticação; não substitui a homologação de colaboradores com contas reais.
