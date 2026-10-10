@@ -172,6 +172,75 @@
           }
         }
       }
+    },
+    "/api/v1/erp_sync": {
+      "post": {
+        "summary": "ERP: dívidas vencidas, baixas e retorno de recebimentos/estornos",
+        "description": "Contrato canônico. Requer mapeamento no integrador do ERP.",
+        "security": [
+          {
+            "IntegrationKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "provider",
+                  "operation"
+                ],
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "sap",
+                      "totvs",
+                      "protheus",
+                      "senior",
+                      "generic"
+                    ]
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "overdue",
+                      "payments",
+                      "poll"
+                    ]
+                  },
+                  "external_id": {
+                    "type": "string"
+                  },
+                  "cursor": {
+                    "type": "integer"
+                  },
+                  "items": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evento aplicado ou repetição idempotente; fila restrita ao credor"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Chave ausente"
+          }
+        }
+      }
     }
   }
 }

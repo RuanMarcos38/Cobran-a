@@ -28,6 +28,7 @@ await db.exec(await readFile(new URL('../database/009-client-access.sql',import.
 await db.exec(await readFile(new URL('../database/010-profile-levels.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/011-sectors-api.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/012-private-sector-policies.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/013-financial-ledger-erp.sql',import.meta.url),'utf8'));
 
 const id='11111111-1111-4111-8111-111111111111';
 
@@ -122,7 +123,7 @@ try{
   for(const section of sections){
    await page.locator(`[data-section="${section}"]`).click();
    await page.waitForFunction(()=>document.querySelector('#content').children.length>0);
-   await page.locator('[data-action=refresh]').click();
+   await page.locator('[data-action=refresh],[data-fin=refresh]').click();
    if(await page.locator('[data-action=export]').count()){const dl=page.waitForEvent('download');await page.locator('[data-action=export]').click();assert.equal((await dl).suggestedFilename(),'cobranca.csv');}
    if(await page.locator('#report-filter').count()){
     await page.locator('#report-filter [name=start]').fill('2026-01-01');await page.locator('#report-filter [name=end]').fill('2026-12-31');await page.locator('#report-filter button').click();
@@ -193,6 +194,20 @@ try{
  assert.equal(await page.locator('[data-module=Relatórios]').count(),1);assert.equal(await page.locator('[data-action=export]').count(),1);assert.equal(await page.locator('[data-tab="4"]').count(),1);assert.equal(await page.locator('[data-module=Financeiro]').count(),0);
  await db.exec(`reset role;update public.cobranca_profiles set client_access='{"processes":false,"history":false,"documents":false,"receipts":false,"reports":false,"export":false}' where id='${id}';set role authenticated;`);await page.reload();await page.getByText('Seu administrador ainda não liberou consultas para este acesso.').waitFor();assert.equal(await page.locator('[data-module]').count(),0);
  console.log('PASS UI portal cliente: menus, tabs and export hidden until granted; all consultations revocable.');
+ await db.exec(`reset role;update public.cobranca_profiles set role='admin',creditor_id=null where id='${id}';set role authenticated;`);await page.reload();await page.locator('#filters').waitFor();
+ await page.locator('[data-section=Faturamento]').click();await page.locator('[data-fin=new]').click();
+ for(const [name,value] of Object.entries({reference:'FAT-UI',party:'Cliente financeiro',description:'Serviço',amount:'60',due_date:'2026-01-01'}))await page.locator(`dialog [name=${name}]`).fill(value);
+ await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('FAT-UI',{exact:true}).waitFor();
+ await page.locator('[data-fin^="settle:"]').first().click();await page.locator('dialog [name=amount]').fill('25');await page.locator('dialog [name=paid_date]').fill('2026-01-02');await page.locator('dialog [name=reference]').fill('FAT-UI-BAIXA');await page.locator('dialog [name=reason]').fill('Teste de baixa');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('R$ 35,00',{exact:true}).waitFor();
+ await page.locator('[data-fin^="reverse:"]').first().click();await page.locator('dialog [name=reason]').fill('Correção');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.locator('[data-fin^="cancel:"]').first().click();await page.locator('dialog [name=reason]').fill('Cancelamento');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Cancelado',{exact:true}).waitFor();
+ await page.locator('[data-section="Contas a pagar"]').click();await page.locator('[data-fin=new]').click();for(const [name,value] of Object.entries({reference:'PAG-UI',party:'Fornecedor',description:'Despesa',amount:'100',due_date:'2026-01-01'}))await page.locator(`dialog [name=${name}]`).fill(value);await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});
+ await page.locator('[data-section="Conciliação bancária"]').click();await page.locator('[data-fin=account]').click();await page.locator('dialog [name=name]').fill('Conta UI');await page.locator('dialog [name=bank]').fill('Banco UI');await page.locator('dialog [name=account_ref]').fill('001/002');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Conta UI',{exact:true}).waitFor();
+ await page.locator('[data-fin=import]').click();await page.locator('dialog [name=statement]').setInputFiles({name:'extrato.csv',mimeType:'text/csv',buffer:Buffer.from('external_ref,booked_date,amount,description\nBANK-UI,2026-01-02,-100,Pagamento\n')});await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('BANK-UI',{exact:true}).waitFor();await page.locator('[data-fin^="match:"]').click();await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.locator('[data-fin^="match:"]').waitFor({state:'hidden'});assert.equal(await page.locator('[data-fin^="match:"]').count(),0);
+ await page.locator('[data-section=Crédito]').click();await page.locator('[data-fin=new]').click();await page.locator('dialog [name=credit_limit]').fill('1000');await page.locator('dialog [name=reason]').fill('Contrato UI');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.locator('[data-fin^="edit:"]').first().waitFor();
+ for(const section of ['Contas a receber','Histórico dos clientes','Integrações ERP']){await page.locator(`[data-section="${section}"]`).click();await page.locator('[data-fin=refresh]').waitFor();await page.locator('[data-fin=refresh]').click();}
+ await page.locator('[data-fin^="configure:"]').first().click();await page.locator('dialog [name=provider]').selectOption('sap');await page.locator('dialog [name=product_version]').fill('SAP Business One — teste de contrato');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('SAP Business One — teste de contrato',{exact:true}).waitFor();
+ console.log('PASS financial UI: invoice/settlement/reversal/cancel, payable, bank account/CSV import/matching, credit and ERP configuration; histories and receivables.');
+
  assert.deepEqual(errors,[]);
 
  console.log('PASS UI local: todos os módulos, relatórios, CSV, impressão acionada, despesas, prospecção, agenda, usuários, documentos, acordo, estorno e encargos contratuais;  login/logout, cliente, devedor, processo, histórico, pagamento, saldo, F5, painel e sete resoluções. Supabase Auth foi substituído por fixture de teste; PostgreSQL e RPC reais locais.');

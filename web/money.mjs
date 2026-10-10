@@ -16,12 +16,12 @@ export function csv(rows){
   const keys=Object.keys(rows[0]);const cell=x=>'"'+String(x??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"';
   return '\uFEFF'+[keys,...rows.map(r=>keys.map(k=>r[k]))].map(r=>r.map(cell).join(';')).join('\r\n');
 }
-export function parseCsv(text){
+export function parseCsv(text,requiredHeaders=['name','document']){
   const rows=[];let row=[],cell='',quoted=false;
   text=text.replace(/^\uFEFF/,'');
   const delimiter=text.split(/\r?\n/)[0].includes(';')?';':',';
   for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){cell+='"';i++;}else quoted=!quoted;}else if(ch===delimiter&&!quoted){row.push(cell);cell='';}else if(ch==='\n'&&!quoted){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell='';}else cell+=ch;}
   if(quoted)throw Error('CSV com aspas não fechadas.');if(cell||row.length){row.push(cell.replace(/\r$/,''));rows.push(row);}
-  const headers=rows.shift()?.map(x=>x.trim());if(!headers?.includes('name')||!headers.includes('document'))throw Error('Cabeçalhos obrigatórios: name,document.');
+  const headers=rows.shift()?.map(x=>x.trim());if(!headers||requiredHeaders.some(h=>!headers.includes(h)))throw Error('Cabeçalhos obrigatórios: '+requiredHeaders.join(',')+'.');
   return rows.filter(r=>r.some(Boolean)).map(r=>{if(r.length!==headers.length)throw Error('Quantidade de colunas inválida.');return Object.fromEntries(headers.map((h,i)=>[h,r[i]]));});
 }
