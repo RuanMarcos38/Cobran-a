@@ -1,7 +1,9 @@
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
-COPY --chown=node:node server.mjs api-http.mjs evolution.mjs openapi.json ./
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
+COPY --chown=node:node server.mjs api-http.mjs evolution.mjs bordero-*.mjs openapi.json ./
 COPY --chown=node:node web ./web
 USER node
 EXPOSE 3000

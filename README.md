@@ -9,7 +9,7 @@ do prompt completo. Não há dados financeiros fictícios na aplicação.
 
 ## Preparar ambiente
 
-Node.js 22 ou superior. A aplicação não requer dependências em execução.
+Node.js 22.13 ou superior. Executar `npm ci` antes de iniciar a aplicação; a leitura de borderôs XLS/PDF usa dependências com versões fixadas.
 
 1. Criar um projeto Supabase separado. Não aplicar os scripts no ERP Ecojoi.
 2. Executar os scripts de `database/` em ordem: esquema original, 002, 003 e 004.
@@ -81,3 +81,7 @@ Aplicar SQL somente em um projeto novo e fazer backup antes de qualquer evoluç�
 
 Ponto de recuperação: commit `1fbaefda522dee1cd105b1e90c92aff1cd4282f1`.
 As alterações estão na branch `codex/saas-cobranca`; a branch main foi preservada.
+
+## Borderôs sem integração
+
+Importação de XLS/XLSX e PDF textual na carteira do credor, com prévia, validação integral e proteção contra duplicidade. Consulte [configuração, testes e limites](docs/IMPORTACAO-BORDERO.md). Esta evolução requer a migração aditiva 015 e a publicação da aplicação atualizada; o pacote n8n e as credenciais existentes permanecem preservados.

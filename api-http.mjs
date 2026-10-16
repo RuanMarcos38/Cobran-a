@@ -1,3 +1,4 @@
+import {extractBordero} from './bordero-http.mjs';
 import {handleWhatsapp} from './evolution.mjs';
 import {readFile} from 'node:fs/promises';
 const limits=new Map();
@@ -10,10 +11,17 @@ export async function handleApi(req,res,env=process.env){
  if(req.method!=='POST'||!/^\/api\/v1\/[a-z_]+$/.test(url.pathname)){send(404,{error:'Endpoint não encontrado'});return true;}
  const ip=req.socket.remoteAddress||'unknown',now=Date.now(),limit=limits.get(ip);if(limit&&limit.until>now&&limit.count>=120){send(429,{error:'Limite de requisições atingido. Aguarde um minuto.'});return true;}limits.set(ip,{until:limit&&limit.until>now?limit.until:now+60000,count:limit&&limit.until>now?limit.count+1:1});if(limits.size>10000)for(const[k,v]of limits)if(v.until<now)limits.delete(k);
  if(!env.SUPABASE_URL||!env.SUPABASE_PUBLISHABLE_KEY){send(503,{error:'Backend indisponível'});return true;}
- let body;try{let size=0,parts=[];for await(const chunk of req){size+=chunk.length;if(size>1024*1024){send(413,{error:'Envio limitado a 1 MB'});return true;}parts.push(chunk);}body=JSON.parse(Buffer.concat(parts).toString('utf8'));if(!body||Array.isArray(body)||typeof body!=='object')throw Error();}catch{send(400,{error:'JSON inválido'});return true;}
+ let body;try{let size=0,parts=[];for await(const chunk of req){size+=chunk.length;if(size>(url.pathname==='/api/v1/bordero_preview'?7*1024*1024:1024*1024)){send(413,{error:url.pathname==='/api/v1/bordero_preview'?'Arquivo limitado a 5 MB':'Envio limitado a 1 MB'});return true;}parts.push(chunk);}body=JSON.parse(Buffer.concat(parts).toString('utf8'));if(!body||Array.isArray(body)||typeof body!=='object')throw Error();}catch{send(400,{error:'JSON inválido'});return true;}
  const operation=url.pathname.split('/').at(-1),bordero=['borderos','erp_sync'].includes(operation);const authorization=req.headers.authorization;
  if(bordero&&!req.headers['x-integration-key']){send(401,{error:'Informe X-Integration-Key'});return true;}
  if(!bordero&&!/^Bearer [A-Za-z0-9._-]+$/.test(authorization||'')){send(401,{error:'Autenticação Bearer obrigatória'});return true;}
+ if(operation==='bordero_preview'){
+  try{
+   const auth=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/cobranca_app',{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:authorization,'Content-Type':'application/json'},body:JSON.stringify({action:'bordero_context',payload:{creditor_id:body.creditor_id}}),signal:AbortSignal.timeout(20000)});
+   const creditor=await auth.json();if(!auth.ok){send(auth.status,{error:creditor.message||'Acesso não autorizado'});return true;}
+   const data=await extractBordero(body.file);send(200,{data:{...data,creditor}});
+  }catch(e){send(400,{error:e.message});}return true;
+ }
  if(['whatsapp_status','whatsapp_send'].includes(operation)){
   const rpc=async(action,payload)=>{const r=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/cobranca_app',{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:authorization,'Content-Type':'application/json'},body:JSON.stringify({action,payload}),signal:AbortSignal.timeout(20000)});const d=await r.json();if(!r.ok)throw Error(d.message||'Acesso não autorizado');return d;};
   try{send(200,{data:await handleWhatsapp(operation,body,rpc,env)});}catch(e){send(400,{error:e.message});}return true;
