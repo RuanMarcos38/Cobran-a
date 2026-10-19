@@ -39,6 +39,11 @@ assert.equal((await rpc('bank_secret_save',{bank_id:bank.id,cipher:'abcdefghij'.
 list=await rpc('bank_list');assert.equal(list.integrations[0].credential_configured,true);assert.equal(list.integrations[0].enabled,false);
 assert.equal(JSON.stringify(list).includes('abcdefghij'),false);
 assert.equal((await rpc('bank_secret_get',{bank_id:bank.id})).cipher,'abcdefghij'.repeat(8));
+// A troca de provedor invalida credenciais antigas e não ativa a emissão.
+const switched=await rpc('bank_save',{...bankData,provider:'bradesco',bank_code:'237'});
+assert.equal(switched.status,'pending_homologation');assert.equal(switched.credential_configured,false);
+assert.equal((await rpc('bank_list')).integrations[0].enabled,false);
+await assert.rejects(()=>rpc('bank_issue',{bank_id:bank.id}),/Emissão bloqueada/);
 await as(finance);assert.equal((await rpc('company_get')).legal_name,company.legal_name);assert.equal((await rpc('bank_list')).integrations.length,1);
 await assert.rejects(()=>rpc('bank_save',bankData));await assert.rejects(()=>rpc('bank_secret_get',{bank_id:bank.id}));
 await as(collector);await assert.rejects(()=>rpc('company_get'));await assert.rejects(()=>rpc('bank_list'));
