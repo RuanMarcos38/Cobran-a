@@ -46,13 +46,13 @@ test('rejeita arquivos não CSV, cabeçalho não reconhecido, aspas quebradas e 
 
 
 test('regressão de layout ELISATEX: 14 lançamentos, 24 colunas, CP1252, identificador composto repetido 3 vezes',()=>{
- const refs=['9883/D','10669/01,9515/D,9493/D','10406/04','10669/01,9515/D,9493/D','10406/D','10899/B','10669/B','RENEGOCIAÇÃO','10669/01,9515/D,9493/D','10899/C','10899/04','10899/03','10899/D','10919/D'];
+ const refs=['DOC-A','LOTE-B,C','DOC-C','LOTE-B,C','DOC-D','DOC-E','DOC-F','RENEGOCIAÇÃO','LOTE-B,C','DOC-G','DOC-H','DOC-I','DOC-J','DOC-K'];
  const dates=['27/01/2026','02/02/2026','02/03/2026','02/03/2026','05/03/2026','09/03/2026','13/03/2026','20/03/2026','31/03/2026','07/04/2026','28/04/2026','05/05/2026','07/05/2026','11/05/2026'];
- const values=['9.495,45','36.469,29','8.478,66','36.469,29','8.478,68','6.606,30','1.756,37','14.228,20','36.469,29','6.606,30','6.606,30','76,28','6.606,30','2.161,05'];
+ const values=Array(14).fill('1.000,00');
  const rows=refs.map((ref,i)=>row(dates[i],ref,'R$ '+values[i]));
  const parsed=parseBorderoCsv(file([header,...rows],'latin1'),'Layout Padrão ELISATEX.csv');
  assert.equal(parsed.count,14);
- assert.equal(parsed.total,'180507.76');
+ assert.equal(parsed.total,'14000.00');
  assert.equal(parsed.errors.length,0);
  assert.equal(parsed.needs_confirmation,true);
  assert.equal(parsed.rows.filter(x=>x.repeated_title).length,3);
@@ -60,5 +60,5 @@ test('regressão de layout ELISATEX: 14 lançamentos, 24 colunas, CP1252, identi
  assert.ok(parsed.warnings.some(x=>/credor invertidos/i.test(x)));
  assert.ok(parsed.warnings.some(x=>/Windows-1252/i.test(x)));
  assert.ok(parsed.warnings.some(x=>/mesmo identificador/i.test(x)));
- // Não publicar dados reais de devedores ou da carteira em testes/commits.
+ // Todos os documentos, identificadores, empresas e valores da amostra são fictícios.
 });
