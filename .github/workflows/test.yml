@@ -10,7 +10,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: node --check web/app.mjs && node --check web/borderos.mjs && node --check web/portfolios.mjs && node --check bordero-csv.mjs && node --check api-http.mjs
+      - run: node --check web/app.mjs && node --check web/borderos.mjs && node --check web/portfolios.mjs && node --check bordero-csv.mjs && node --check api-http.mjs && node --check web/chat.mjs && node --check web/whatsapp-connection.mjs && node --check web/pricing.mjs && node --check evolution.mjs && node --check whatsapp.mjs
       - run: npm test
       - run: npm run test:db
       - run: node tests/sectors.local.mjs
