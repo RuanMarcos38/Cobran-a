@@ -16,5 +16,6 @@ jobs:
       - run: node tests/sectors.local.mjs
       - run: node tests/finance.local.mjs
       - run: node tests/pricing.local.mjs
+      - run: node tests/bordero-csv.local.mjs
       - run: node tests/scheduling.local.mjs
       - run: node --check web/app.mjs && node --check server.mjs
