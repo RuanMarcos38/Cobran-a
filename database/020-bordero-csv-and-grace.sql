@@ -30,8 +30,12 @@ begin
  if jsonb_array_length(payload->'rows') not between 1 and 1000 then raise exception 'Informe de 1 a 1.000 títulos';end if;
  source_hash:=payload->>'file_hash';if source_hash is null or source_hash !~ '^[a-f0-9]{64}$' or length(coalesce(payload->>'file_name','')) not between 1 and 200 then raise exception 'Identificação de arquivo inválida';end if;
  select id into assigned from public.cobranca_profiles where tenant_id=p.tenant_id and active and role='collector' order by id limit 1;
- if assigned is null then raise exception 'Cadastre um negociador antes de importar borderôs';end if;
+ if assigned is null then assigned:=p.id;end if; -- Sem negociador, manter os processos com o gestor autenticado, sem disparos
  terms:=jsonb_build_object('mode',coalesce(c.metadata->>'financial_mode','none'),'interest_percent',coalesce((c.metadata->>'default_interest')::numeric,0),'fine_percent',coalesce((c.metadata->>'default_fine')::numeric,0),'grace_days',coalesce((c.metadata->>'grace_days')::int,0));
+ if nullif(trim(coalesce(payload->>'contract_ref','')),'') is null then
+  -- Não cobrar encargos sem referência ao documento que os autoriza.
+  terms:=terms||jsonb_build_object('mode','none','interest_percent',0,'fine_percent',0);
+ end if;
  for item in select value from jsonb_array_elements(payload->'rows') loop
   if coalesce((item->>'repeated_title')::boolean,false) and not coalesce((payload->>'acknowledge_repeated_titles')::boolean,false) then raise exception 'Títulos com identificação repetida exigem confirmação expressa';end if;
   external:=trim(coalesce(item->>'external_ref',''));amount:=nullif(item->>'original_amount','')::numeric;
@@ -63,7 +67,7 @@ begin
   select (j->>'id')::uuid into ident from (select cobranca_private.api('new_process',
    item||terms||jsonb_build_object('creditor_id',c.id,'debtor_id',b.id,'assigned_to',assigned,'contract_ref',payload->>'contract_ref','external_ref',external,'original_amount',amount)) j) q;
   update public.cobranca_debts set invoice_ref=coalesce(item->>'invoice_ref',item->'raw'->>'external_ref'),description=item->>'notes',
-   metadata=metadata||jsonb_build_object('file_bordero',true,'bordero_id',batch,'file_hash',source_hash,'file_name',payload->>'file_name','source_row',item->>'source','original_fields',item->'raw') where id=ident;
+   metadata=metadata||jsonb_build_object('file_bordero',true,'bordero_id',batch,'file_hash',source_hash,'file_name',payload->>'file_name','source_row',item->>'source','original_fields',item->'raw','charges_deferred',nullif(trim(coalesce(payload->>'contract_ref','')),'') is null) where id=ident;
   created_count:=created_count+1;result:=result||jsonb_build_array(jsonb_build_object('id',ident,'external_ref',external,'duplicate',false));
  end loop;
  perform cobranca_private.audit(p.tenant_id,'bordero_import','creditors',c.id,null,jsonb_build_object('batch_id',batch,'file_name',payload->>'file_name','file_hash',source_hash,'created',created_count,'duplicates',duplicate_count));
