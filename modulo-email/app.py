@@ -9,6 +9,8 @@ import secrets
 import smtplib
 import sqlite3
 import ssl
+import sys
+import webbrowser
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from email.message import EmailMessage
@@ -240,8 +242,19 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == '__main__':
+    if '--check-smtp' in sys.argv:
+        try:
+            with smtplib.SMTP_SSL('smtp.hostinger.com', 465, context=ssl.create_default_context(), timeout=20) as smtp:
+                smtp.login(FROM, os.environ.get('SMTP_PASSWORD', ''))
+            print('Autenticacao na Hostinger confirmada. Nenhum email enviado.')
+        except Exception:
+            print('Nao foi possivel autenticar. Confira a senha da caixa postal e a conexao.')
+            sys.exit(1)
+        sys.exit(0)
     init()
     server = HTTPServer(('127.0.0.1', int(os.environ.get('PORT', '8765'))), Handler)
     print('Abra somente neste computador: http://127.0.0.1:' + str(server.server_port) + '/' + TOKEN)
     print('Módulo local. Ctrl+C para encerrar. Não publique esta porta na internet.')
+    if '--open' in sys.argv:
+        webbrowser.open('http://127.0.0.1:' + str(server.server_port) + '/' + TOKEN)
     server.serve_forever()

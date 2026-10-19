@@ -1,5 +1,11 @@
 # Cobrança por email — módulo local
 
+## Inicialização pronta no Windows
+
+Abra `Abrir-cobranca.cmd`. Na primeira abertura, informe a senha da caixa postal na janela local (entrada protegida). O assistente testa a autenticação SMTP sem enviar email, salva a credencial criptografada pelo Windows em `smtp-credencial.xml` e abre a tela no navegador. Nas próximas aberturas, reutiliza a credencial. Ela só pode ser descriptografada pelo mesmo usuário Windows neste computador. O arquivo é excluído do Git e não acompanha o pacote entregue. Para trocar a senha, feche o módulo e remova somente esse arquivo antes de abrir novamente.
+
+O teste confirma conexão e autenticação, não entrega de mensagens. O envio continua exigindo revisão e confirmação na tela. Mantenha a janela do módulo aberta durante o uso.
+
 Módulo adicional independente, sem alterar o workflow n8n, o banco Supabase ou os arquivos originais. Não existe uma tela anterior no repositório: esta é uma nova tela de cobrança. Os cadastros feitos aqui ficam no SQLite local; não são sincronizados com n8n ou outro sistema.
 
 ## Abrir
