@@ -1,7 +1,7 @@
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const textField=(name,label,value='',required=false,type='text')=>\`<label>\${esc(label)}<input name="\${esc(name)}" type="\${esc(type)}" value="\${esc(value)}" maxlength="250" \${required?'required':''}></label>\`;
-const select=(name,label,items,value)=>\`<label>\${esc(label)}<select name="\${esc(name)}" required>\${items.map(item=>\`<option value="\${esc(item.id)}" \${String(value)===String(item.id)?'selected':''}>\${esc(item.name)}</option>\`).join('')}</select></label>\`;
-const actions=(id,label)=>\`<button type="button" data-bank-action="\${esc(id)}">\${esc(label)}</button>\`;
+const textField=(name,label,value='',required=false,type='text')=>`<label>${esc(label)}<input name="${esc(name)}" type="${esc(type)}" value="${esc(value)}" maxlength="250" ${required?'required':''}></label>`;
+const select=(name,label,items,value)=>`<label>${esc(label)}<select name="${esc(name)}" required>${items.map(item=>`<option value="${esc(item.id)}" ${String(value)===String(item.id)?'selected':''}>${esc(item.name)}</option>`).join('')}</select></label>`;
+const actions=(id,label)=>`<button type="button" data-bank-action="${esc(id)}">${esc(label)}</button>`;
 const providers=[['manual','Cadastro/boletos existentes (sem integração automática)'],['inter','Banco Inter'],['itau','Itaú'],['bradesco','Bradesco'],['bb','Banco do Brasil'],['sicoob','Sicoob'],['sicredi','Sicredi'],['santander','Santander'],['caixa','Caixa Econômica'],['outro','Outro banco (adaptador pendente)']].map(([id,name])=>({id,name}));
 const environments=[{id:'homologation',name:'Homologação / testes'},{id:'production',name:'Produção — sujeito a homologação bancária'}];
 
@@ -11,11 +11,11 @@ export async function renderCompanyBank(section,{api,modal,guard,notify},target)
  const on=(id,fn)=>target.querySelector('[data-bank-action="'+id+'"]')?.addEventListener('click',()=>guard(fn));
  const company=await api.rpc('company_get');
  if(section==='Minha empresa'){
-  target.innerHTML=\`<div class="toolbar">\${admin?actions('edit-company','Editar dados da minha empresa'):''}\${actions('refresh','Atualizar')}</div>
-  <div class="panel"><h3>\${esc(company.legal_name)}</h3><p>Cadastro da empresa que utiliza o sistema. Estas informações são isoladas das demais empresas, credores e devedores.</p>
+  target.innerHTML=`<div class="toolbar">${admin?actions('edit-company','Editar dados da minha empresa'):''}${actions('refresh','Atualizar')}</div>
+  <div class="panel"><h3>${esc(company.legal_name)}</h3><p>Cadastro da empresa que utiliza o sistema. Estas informações são isoladas das demais empresas, credores e devedores.</p>
    <dl class="company-details">
-   \${[['Razão social',company.legal_name],['Nome fantasia',company.trade_name],['CNPJ',company.cnpj],['E-mail',company.email],['Telefone',company.phone],['Contato',company.contact_name],['Endereço',[company.street,company.street_number,company.district,company.city,company.state,company.zip_code].filter(Boolean).join(', ')]].map(([k,v])=>\`<div><dt>\${esc(k)}</dt><dd>\${esc(v||'Não informado')}</dd></div>\`).join('')}
-   </dl><p>A empresa usuária possui cadastro e configurações bancárias próprios; os credores são cadastrados separadamente.</p></div>\`;
+   ${[['Razão social',company.legal_name],['Nome fantasia',company.trade_name],['CNPJ',company.cnpj],['E-mail',company.email],['Telefone',company.phone],['Contato',company.contact_name],['Endereço',[company.street,company.street_number,company.district,company.city,company.state,company.zip_code].filter(Boolean).join(', ')]].map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v||'Não informado')}</dd></div>`).join('')}
+   </dl><p>A empresa usuária possui cadastro e configurações bancárias próprios; os credores são cadastrados separadamente.</p></div>`;
   on('refresh',rerender);
   on('edit-company',()=>modal('Dados cadastrais da empresa',
    textField('legal_name','Razão social',company.legal_name,true)+textField('trade_name','Nome fantasia',company.trade_name)+
@@ -29,17 +29,17 @@ export async function renderCompanyBank(section,{api,modal,guard,notify},target)
  }
  const data=await api.rpc('bank_list');
  const accounts=data.accounts||[],integrations=data.integrations||[];
- target.innerHTML=\`<div class="toolbar">\${admin?actions('new-account','Cadastrar conta bancária')+actions('new-integration','Configurar integração bancária'):''}\${actions('refresh','Atualizar')}</div>
+ target.innerHTML=`<div class="toolbar">${admin?actions('new-account','Cadastrar conta bancária')+actions('new-integration','Configurar integração bancária'):''}${actions('refresh','Atualizar')}</div>
   <div class="panel"><h3>Contas e integração de boletos da empresa</h3>
    <p>Cadastre a conta bancária da própria empresa, informe convênio, carteira e dados de integração. A preparação não cria nem registra boletos automaticamente. É necessária aprovação e homologação do banco antes da emissão real.</p>
    <h3>Contas cadastradas</h3>
    <div class="table-wrap"><table><thead><tr><th>Conta</th><th>Banco</th><th>Agência / conta</th></tr></thead><tbody>
-   \${accounts.map(x=>\`<tr><td>\${esc(x.name)}</td><td>\${esc(x.bank)}</td><td>\${esc(x.account_ref)}</td></tr>\`).join('')||'<tr><td colspan="3">Cadastre a primeira conta na seção Conciliação bancária ou aqui.</td></tr>'}</tbody></table></div>
+   ${accounts.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.bank)}</td><td>${esc(x.account_ref)}</td></tr>`).join('')||'<tr><td colspan="3">Cadastre a primeira conta na seção Conciliação bancária ou aqui.</td></tr>'}</tbody></table></div>
    <h3>Configurações da API bancária</h3>
    <div class="table-wrap"><table><thead><tr><th>Banco</th><th>Ambiente</th><th>Convênio</th><th>Credenciais</th><th>Situação</th><th>Ações</th></tr></thead><tbody>
-   \${integrations.map(b=>\`<tr><td>\${esc(b.bank_name)} (\${esc(b.bank_code)})</td><td>\${esc(b.environment)}</td><td>\${esc(b.agreement||'—')}</td><td>\${b.credential_configured?'Armazenadas com criptografia':'Não informadas'}</td><td>\${esc(b.connection_status==='approved'?'Homologado':b.connection_status==='configured'?'Credenciais cadastradas; homologação pendente':'Aguardando homologação')}</td><td>\${admin?actions('edit:'+b.id,'Editar')+(b.provider!=='manual'&&b.provider!=='outro'?actions('credential:'+b.id,'Credenciais')+actions('test:'+b.id,'Verificar prontidão'):''):''}</td></tr>\`).join('')||'<tr><td colspan="6">Nenhuma integração bancária configurada.</td></tr>'}</tbody></table></div>
+   ${integrations.map(b=>`<tr><td>${esc(b.bank_name)} (${esc(b.bank_code)})</td><td>${esc(b.environment)}</td><td>${esc(b.agreement||'—')}</td><td>${b.credential_configured?'Armazenadas com criptografia':'Não informadas'}</td><td>${esc(b.connection_status==='approved'?'Homologado':b.connection_status==='configured'?'Credenciais cadastradas; homologação pendente':'Aguardando homologação')}</td><td>${admin?actions('edit:'+b.id,'Editar')+(b.provider!=='manual'&&b.provider!=='outro'?actions('credential:'+b.id,'Credenciais')+actions('test:'+b.id,'Verificar prontidão'):''):''}</td></tr>`).join('')||'<tr><td colspan="6">Nenhuma integração bancária configurada.</td></tr>'}</tbody></table></div>
    <p role="note"><strong>Proteção:</strong> nenhuma emissão bancária, liquidação ou baixa será executada por esta tela sem integração homologada. Nenhuma chave bancária fica exposta no navegador após salvar.</p>
-  </div>\`;
+  </div>`;
  const bankForm=bank=>{if(!accounts.length)throw Error('Cadastre primeiro uma conta bancária.');
  const fields=select('account_id','Conta bancária',[{id:'',name:'Selecione'},...accounts.map(x=>({id:x.id,name:x.name+' · '+x.bank+' · '+x.account_ref}))],bank?.account_id||'')+
   select('provider','Banco / provedor',providers,bank?.provider||'manual')+
