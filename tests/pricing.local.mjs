@@ -119,6 +119,26 @@ assert.equal((await rpc('pricing_snapshot',{contract_id:version1.id,period:'2026
 assert.equal((await rpc('pricing_snapshot',{contract_id:version2.id,period:'2026-02-01'})).minimum,590);
 assert.equal((await rpc('pricing_close',{contract_id:version1.id,period:'2026-02-01',operation:'draft'})).billing,0);
 assert.equal((await rpc('pricing_close',{contract_id:version2.id,period:'2026-02-01',operation:'draft'})).billing,590);
+
+await as(admin);
+const terms={overdue_cutoffs:[7,21,45,120],volume_cutoffs:[2,5,8,11],volume_discounts:[0,2,4,6,9],minimum_fee_rate:1};
+const editable=await rpc('pricing_contract',{creditor_id:creditor,contract_ref:'CUSTOM-RATES',model:'B',starts_on:'2026-01-01',ends_on:'2027-12-31',rates:[4,8,12,16,22],minimums:[100,200,300,400,500],volume_discount:true,terms});
+assert.deepEqual(editable.terms.overdue_cutoffs,[7,21,45,120]);
+const configured=await rpc('pricing_simulate',{creditor_id:creditor,contract_id:editable.id,model:'B',debtors:6,titles:6,recovery_percent:100,bands:[1000,0,0,0,0],cost:0});
+assert.equal(configured.discount,4);assert.equal(configured.minimum,300);assert.equal(configured.rows[0].rate,1);assert.equal(configured.fees,10);
+const configuredCorporate=await rpc('pricing_simulate',{creditor_id:creditor,contract_id:editable.id,model:'B',debtors:12,titles:12,recovery_percent:100,bands:[1000,0,0,0,0],cost:0});
+assert.equal(configuredCorporate.discount,9);assert.equal(configuredCorporate.minimum,500);
+for(const [days,band]of [[0,0],[7,1],[8,2],[21,2],[22,3],[45,3],[46,4],[120,4],[121,5]]){
+ const x=await raw('select cobranca_private.fee_band_config($1,$2::jsonb) band',[days,JSON.stringify(terms.overdue_cutoffs)]);assert.equal(x.rows[0].band,band);
+}
+for(const [count,band]of [[1,1],[2,2],[4,2],[5,3],[7,3],[8,4],[10,4],[11,5]]){
+ const x=await raw('select cobranca_private.fee_volume_band_config($1,$2::jsonb) band',[count,JSON.stringify(terms.volume_cutoffs)]);assert.equal(x.rows[0].band,band);
+}
+await as(admin);
+for(const invalidTerms of [{...terms,overdue_cutoffs:[7,5,45,120]},{...terms,volume_discounts:[0,2,4,-1,9]},{...terms,minimum_fee_rate:101}]){
+ await assert.rejects(()=>rpc('pricing_contract',{creditor_id:creditor,contract_ref:'INVALID-CUSTOM',model:'B',starts_on:'2026-01-01',ends_on:'2027-12-31',rates:[4,8,12,16,22],terms:invalidTerms}));
+}
+assert.deepEqual((await rpc('pricing_list')).contracts.find(c=>c.id===contract.id).rates,[10,15,20,25,30]);
 console.log('PASS pricing: exact commercial examples; age and volume boundaries; CPF/CNPJ; installments; partial/pre-due payments; immutable legacy; approval/replay; compensated reversal; permissions and tenant isolation. No billing or transfers.');
 if(process.env.PRICING_UI==='1'){await as(admin);await (await import('./pricing-ui.mjs')).runPricingUi({db,admin,creditor,contract:contractB});}
 await db.close();
