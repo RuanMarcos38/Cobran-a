@@ -20,6 +20,8 @@ test('configuração verifica SMTP antes de persistir e não retorna senha',asyn
  const calls=[];const rpc=async(kind,action,payload)=>{calls.push(action);if(kind==='app')return context().profile;return {ok:true};};
  const result=await handleEmail('email_configure',{password:'secret-test'},rpc,env,()=>({verify:async()=>{},close(){}}));assert.equal(result.configured,true);assert.deepEqual(calls,['profile','config_save']);assert.ok(!JSON.stringify(result).includes('secret-test'));
  await assert.rejects(()=>handleEmail('email_configure',{password:'secret-test'},rpc,env,()=>({verify:async()=>{throw Error('secret-test');},close(){}})),/autenticar/);
+ await assert.rejects(()=>handleEmail('email_configure',{password:'secret-test'},rpc,env,()=>({verify:async()=>{throw Object.assign(Error('secret-test'),{code:'EAUTH',responseCode:535});},close(){}})),/recusou o login/);
+ await assert.rejects(()=>handleEmail('email_configure',{password:'secret-test'},rpc,env,()=>({verify:async()=>{throw Object.assign(Error('secret-test'),{code:'ETIMEDOUT'});},close(){}})),/Falha de conexão: ETIMEDOUT/);
 });
 test('envio só ocorre após claim; falha fica incerta',async()=>{
  const c=context(),message=renderEmail(c,{template:'primeiro_contato'}),calls=[];

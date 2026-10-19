@@ -34,7 +34,11 @@ export async function handleEmail(operation,body,rpc,env=process.env,makeTranspo
   if(!admins.includes(profile.role))throw Error('Somente administradores podem configurar o remetente.');
   if(typeof body.password!=='string'||!body.password||body.password.length>1000)throw Error('Informe a senha da caixa de cobrança.');
   const cipher=encrypt(body.password,profile.tenant_id,env),client=makeTransport(body.password);
-  try{await client.verify();}catch{throw Error('Não foi possível autenticar na Hostinger. Confira a senha da caixa postal.');}finally{client.close();}
+  try{await client.verify();}catch(error){
+   if(error.code==='EAUTH')throw Error('A Hostinger recusou o login da caixa cobranca@rrestrategiaperformance.com.br. Confira a senha dessa caixa (não a senha do hPanel). Código SMTP: '+(Number(error.responseCode)||535)+'.');
+   if(['ESOCKET','ECONNECTION','ETIMEDOUT','EDNS','ECONNREFUSED','ENOTFOUND'].includes(error.code))throw Error('Não foi possível conectar ao SMTP da Hostinger na porta 465. Falha de conexão: '+error.code+'. A senha não foi salva.');
+   throw Error('Não foi possível autenticar na Hostinger. Confira a senha da caixa postal.');
+  }finally{client.close();}
   await rpc('email','config_save',{cipher});return {configured:true,from:sender};
  }
  if(operation==='email_preview'){
