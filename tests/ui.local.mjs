@@ -31,6 +31,8 @@ await db.exec(await readFile(new URL('../database/012-private-sector-policies.sq
 await db.exec(await readFile(new URL('../database/013-financial-ledger-erp.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/014-chat-reports.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/015-pricing.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../supabase/migrations/20261019005921_n8n_commercial_schedule.sql',import.meta.url),'utf8'));
+
 
 const id='11111111-1111-4111-8111-111111111111';
 
@@ -193,7 +195,7 @@ try{
  await page.locator('[data-chat-refresh]').click();await page.getByText('Olá😀',{exact:true}).waitFor();await page.getByLabel('Pesquisar conversas').fill('inexistente');assert.equal(await page.locator('[data-chat-id]:visible').count(),0);await page.getByLabel('Pesquisar conversas').fill('');
  await page.getByRole('button',{name:'Usar tema escuro',exact:true}).click();assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');await page.reload();await page.locator('[data-theme-toggle]').waitFor();assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');await page.getByRole('button',{name:'Usar tema claro',exact:true}).click();assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
  console.log('PASS attendance UI: emoji, file download/removal, real browser audio recording/playback, search, refresh, disconnected WhatsApp blocked, persisted dark/light theme.');
- await page.locator('[data-section=Agendamentos]').click();await page.locator('[data-sector=new]').click();await page.locator('dialog [name=name]').fill('Agenda CRM UI');await page.locator('dialog [name=due_at]').fill('2026-10-20T10:00');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Agenda CRM UI',{exact:true}).waitFor();
+ await page.locator('[data-section=Agendamentos]').click();await page.locator('[data-sector=new]').click();await page.locator('dialog [name=name]').fill('Agenda CRM UI');await page.locator('dialog [name=due_at]').fill('2026-10-20T10:00');await page.locator('dialog [name=end_at]').fill('2026-10-20T10:30');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.getByText('Agenda CRM UI',{exact:true}).waitFor();
  for(const section of ['Funil / Kanban','Atendimento','Comissões comerciais']){await page.locator(`[data-section="${section}"]`).click();await page.locator('[data-sector=refresh],[data-chat-refresh]').waitFor();await page.locator('[data-sector=refresh],[data-chat-refresh]').click();}
  await page.locator('[data-action=notifications]').click();await page.getByRole('heading',{name:'Pendências operacionais'}).waitFor();await page.locator('dialog [data-cancel]').first().click();await page.keyboard.press('F7');assert.equal(await page.locator('[data-module=Processo]').count(),0);
  await page.setViewportSize({width:390,height:844});await page.locator('[data-action=menu]').click();await page.locator('[data-section="Funil / Kanban"]').click();assert.equal(await page.evaluate(()=>document.body.classList.contains('menu-open')),false);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.locator('[data-sector=refresh]').waitFor();await page.setViewportSize({width:1366,height:768});
