@@ -18,12 +18,12 @@ export async function sendEvolution(c,message,fetcher=fetch){
  else{endpoint='/message/sendText';body={number,text:message.content,linkPreview:false};}
  const data=await call(c,endpoint,body,fetcher);const id=data?.key?.id;if(typeof id!=='string'||!id)throw Error('O provedor não confirmou o envio. Verifique antes de tentar novamente.');return {provider_id:id,status:'accepted'};
 }
-export async function handleWhatsapp(operation,body,rpc,env){
+export async function handleWhatsapp(operation,body,rpc,env,fetcher=fetch){
  const profile=await rpc('profile',{});if(!['admin','master','commercial','commercial_manager'].includes(profile.role))throw Error('Atendimento não autorizado');
- const c=connectionFor(env,profile.tenant_id);const status=await connectionStatus(c);
+ const c=connectionFor(env,profile.tenant_id);const status=await connectionStatus(c,fetcher);
  if(operation==='whatsapp_status')return status;
  if(!status.ready)throw Error('WhatsApp pendente. Conecte um número comercial à Evolution API.');
  const message=await rpc('chat_claim',{id:body.id,message_id:body.message_id});if(message.already)return {provider_id:message.provider_id,status:'accepted'};
- try{const result=await sendEvolution(c,message);await rpc('chat_delivery',{id:body.id,message_id:body.message_id,claim:message.claim,...result});return result;}
+ try{const result=await sendEvolution(c,message,fetcher);await rpc('chat_delivery',{id:body.id,message_id:body.message_id,claim:message.claim,...result});return result;}
  catch(error){await rpc('chat_delivery',{id:body.id,message_id:body.message_id,claim:message.claim,status:'unknown'}).catch(()=>{});throw error;}
 }
