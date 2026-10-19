@@ -1,3 +1,4 @@
+import {handleBank} from './bank.mjs';
 import {parseBorderoCsv} from './bordero-csv.mjs';
 import {handleChannel} from './whatsapp.mjs';
 import {issueBooking} from './booking.mjs';
@@ -36,6 +37,11 @@ export async function handleApi(req,res,env=process.env){
  if(['email_status','email_configure','email_preview','email_send','email_history'].includes(operation)){
   const rpc=async(kind,action,payload)=>{const r=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/'+(kind==='email'?'cobranca_email':'cobranca_app'),{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:authorization,'Content-Type':'application/json'},body:JSON.stringify({action,payload}),signal:AbortSignal.timeout(20000)});const d=await r.json();if(!r.ok)throw Error(d.message||'Acesso não autorizado');return d;};
   try{send(200,{data:await handleEmail(operation,body,rpc,env)});}catch(e){send(400,{error:e.message});}return true;
+ }
+ if(['bank_configure','bank_connection_test'].includes(operation)){
+  const rpc=async(action,payload)=>{const response=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/cobranca_app',{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:authorization,'Content-Type':'application/json'},body:JSON.stringify({action,payload}),signal:AbortSignal.timeout(20000)});const result=await response.json();if(!response.ok)throw Error(result.message||'Sem autorização bancária');return result;};
+  try{send(200,{data:await handleBank(operation,body,rpc,env)});}catch(error){send(400,{error:error.message});}
+  return true;
  }
  if(['whatsapp_status','whatsapp_send','whatsapp_configure','whatsapp_qr'].includes(operation)){
   const rpc=async(kind,action,payload)=>{const r=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/'+(kind==='improve'?'cobranca_improvements':'cobranca_app'),{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:authorization,'Content-Type':'application/json'},body:JSON.stringify({action,payload}),signal:AbortSignal.timeout(20000)});const d=await r.json();if(!r.ok)throw Error(d.message||'Acesso não autorizado');return d;};
