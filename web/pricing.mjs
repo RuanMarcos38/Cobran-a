@@ -61,10 +61,10 @@ export async function renderPricing(section,{api,guard,modal,notify},target){
        const amounts=Array.from({length:5},(_,i)=>Number(d['minimum_'+i]));
        const floor=Number(d.minimum_fee_rate);
        const ascending=list=>list.every((v,i)=>Number.isSafeInteger(v)&&v>0&&(i===0||v>list[i-1]));
-       const percent=v=>Number.isFinite(v)&&v>=0&&v<=100&&Math.round(v*100)===v*100;
+       const percent=v=>Number.isFinite(v)&&v>=0&&v<=100&&Math.abs(v*100-Math.round(v*100))<1e-7;
        if(!ascending(age)||!ascending(volume))throw Error('Os limites de atraso e volume devem ser inteiros, positivos e crescentes.');
        if(!rateValues.every(percent)||!discounts.every(percent)||!percent(floor))throw Error('Informe taxas e descontos de 0 a 100%, com duas casas decimais.');
-       if(!amounts.every(v=>Number.isFinite(v)&&v>=0&&v<=999999999.99&&Math.round(v*100)===v*100))throw Error('Mínimos inválidos: informe valores monetários não negativos.');
+       if(!amounts.every(v=>Number.isFinite(v)&&v>=0&&v<=999999999.99&&Math.abs(v*100-Math.round(v*100))<1e-7))throw Error('Mínimos inválidos: informe valores monetários não negativos.');
        if(d.starts_on>d.ends_on)throw Error('O início da vigência deve ser anterior ou igual ao término.');
        await api.rpc('pricing_contract',{creditor_id:d.creditor_id,contract_ref:d.contract_ref,model:d.model,starts_on:d.starts_on,ends_on:d.ends_on,volume_discount:d.volume_discount==='true',corporate_discount:discounts[4],rates:rateValues,minimums:amounts,terms:{snapshot_policy:d.snapshot_policy,recipient:d.recipient,post_end_days:d.post_end_days,payment_terms:d.payment_terms,commercial_owner:d.commercial_owner,finance_owner:d.finance_owner,closing_day:d.closing_day,overdue_cutoffs:age,volume_cutoffs:volume,volume_discounts:discounts,minimum_fee_rate:floor}});
      });
