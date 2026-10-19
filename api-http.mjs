@@ -1,4 +1,5 @@
 import {handleWhatsapp} from './evolution.mjs';
+import {handleEmail} from './email.mjs';
 import {readFile} from 'node:fs/promises';
 const limits=new Map();
 export async function handleApi(req,res,env=process.env){
@@ -14,6 +15,10 @@ export async function handleApi(req,res,env=process.env){
  const operation=url.pathname.split('/').at(-1),bordero=['borderos','erp_sync','commercial_schedule'].includes(operation);const authorization=req.headers.authorization;
  if(bordero&&!req.headers['x-integration-key']){send(401,{error:'Informe X-Integration-Key'});return true;}
  if(!bordero&&!/^Bearer [A-Za-z0-9._-]+$/.test(authorization||'')){send(401,{error:'Autenticação Bearer obrigatória'});return true;}
+ if(['email_status','email_configure','email_preview','email_send','email_history'].includes(operation)){
+  const rpc=async(kind,action,payload)=>{const r=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/'+(kind==='email'?'cobranca_email':'cobranca_app'),{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:authorization,'Content-Type':'application/json'},body:JSON.stringify({action,payload}),signal:AbortSignal.timeout(20000)});const d=await r.json();if(!r.ok)throw Error(d.message||'Acesso não autorizado');return d;};
+  try{send(200,{data:await handleEmail(operation,body,rpc,env)});}catch(e){send(400,{error:e.message});}return true;
+ }
  if(['whatsapp_status','whatsapp_send'].includes(operation)){
   const rpc=async(action,payload)=>{const r=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/cobranca_app',{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:authorization,'Content-Type':'application/json'},body:JSON.stringify({action,payload}),signal:AbortSignal.timeout(20000)});const d=await r.json();if(!r.ok)throw Error(d.message||'Acesso não autorizado');return d;};
   try{send(200,{data:await handleWhatsapp(operation,body,rpc,env)});}catch(e){send(400,{error:e.message});}return true;
