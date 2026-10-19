@@ -1,5 +1,9 @@
 -- Migration 021: apenas funções aditivas e novas versões de contrato. Nenhum UPDATE de títulos, snapshots ou recebimentos.
 begin;
+-- Regra anterior limitava o último desconto a 22 p.p.; agora o administrador pode
+-- configurar até 100 p.p. como nas demais faixas, sem modificar valores existentes.
+alter table cobranca_private.fee_contracts drop constraint if exists fee_contracts_corporate_discount_check;
+alter table cobranca_private.fee_contracts add constraint fee_contracts_corporate_discount_check check(corporate_discount between 0 and 100);
 create or replace function cobranca_private.fee_band_config(days integer,limits jsonb) returns integer language plpgsql immutable set search_path='' as $$
 declare cutoffs jsonb:=coalesce(limits,'[30,90,180,365]'::jsonb);i integer;
 begin
