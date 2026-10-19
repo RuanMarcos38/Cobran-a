@@ -94,3 +94,7 @@ html[data-theme=dark] .chat-contacts button{border-color:#26343c}html[data-theme
 @media(max-width:768px){.chat-layout{grid-template-columns:1fr}.chat-contacts{max-height:175px}.chat-contacts button{min-height:65px;padding:10px}.chat-empty{min-height:350px}.chat-messages{height:340px}.chat-controls [type=submit]{width:auto;min-height:44px}.integration-steps{grid-template-columns:1fr}.chat-text textarea{font-size:16px}}
 
 @media print{body:has(dialog[open]) #app{display:none}dialog[open]{position:static;max-width:none;width:100%;max-height:none;overflow:visible;border:0;background:white!important;color:black!important}dialog[open] .form-grid{display:block}dialog[open] .modal-actions,dialog[open] [data-cancel]{display:none}dialog[open] .table-wrap{overflow:visible}dialog[open] .metric strong{color:black!important}}
+
+/* Prévia de cobrança: mantém quebras e evita texto fora da tela. */
+.email-preview{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.6;grid-column:1/-1;padding:16px;border:1px solid var(--border,#cbd5e1);border-radius:8px}
+[hidden]{display:none!important}
