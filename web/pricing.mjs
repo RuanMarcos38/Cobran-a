@@ -17,9 +17,69 @@ export async function renderPricing(section,{api,guard,modal,notify},target){
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo'}).format(new Date()),period=today.slice(0,7)+'-01';
  const on=(id,fn)=>target.querySelector(`[data-fee="${id}"]`)?.addEventListener('click',()=>guard(fn));
  if(section==='Precificação e Honorários'){
-  target.innerHTML=`<div class="toolbar">${data.can_configure?'<button data-fee="new" class="primary">Novo contrato / versão</button>':''}<button data-fee="refresh">Atualizar</button></div><div class="panel"><p>Taxas comerciais por contrato. A classificação usa o vencimento original e a data de entrada; o volume é congelado por competência. Títulos anteriores com recebimentos mantêm os honorários históricos.</p>${table(data.contracts,[['creditor_name','Credor'],['contract_ref','Contrato'],['version','Versão'],['model','Modelo'],['starts_on','Início'],['ends_on','Término'],['volume_discount','Desconto por volume'],['titles','Títulos classificados']])}${data.contracts.map(c=>`<div class="toolbar"><span>${esc(c.creditor_name)} · ${esc(c.contract_ref)} · v${c.version} · Taxas: ${esc(c.rates.join(' / '))}%</span>${data.can_configure?`<button data-fee="enroll:${esc(c.id)}">Conferir taxas dos títulos</button><button data-fee="import:${esc(c.id)}">Importar carteira CSV</button>`:''}</div>`).join('')}</div>`;
+  target.innerHTML=`<div class="toolbar">${data.can_configure?'<button data-fee="new" class="primary">Novo contrato / versão</button>':''}<button data-fee="refresh">Atualizar</button></div><div class="panel"><p>Taxas comerciais por contrato. A classificação usa o vencimento original e a data de entrada; o volume é congelado por competência. Títulos anteriores com recebimentos mantêm os honorários históricos.</p>${table(data.contracts,[['creditor_name','Credor'],['contract_ref','Contrato'],['version','Versão'],['model','Modelo'],['starts_on','Início'],['ends_on','Término'],['volume_discount','Desconto por volume'],['titles','Títulos classificados']])}${data.contracts.map(c=>`<div class="toolbar"><span>${esc(c.creditor_name)} · ${esc(c.contract_ref)} · v${c.version} · Taxas: ${esc(c.rates.join(' / '))}%</span>${data.can_configure?`<button data-fee="version:${esc(c.id)}">Criar versão / editar taxas</button><button data-fee="enroll:${esc(c.id)}">Conferir taxas dos títulos</button><button data-fee="import:${esc(c.id)}">Importar carteira CSV</button>`:''}</div>`).join('')}</div>`;
   on('refresh',()=>renderPricing(section,{api,guard,modal,notify},target));
-  on('new',()=>modal('Condições comerciais do contrato',`<p>Salvar cria uma nova versão. Não altera honorários anteriores nem outros credores. O modelo A inicia sem desconto e sem mínimo.</p>${select('creditor_id','Credor',lookups.creditors)}${input('contract_ref','Referência exata do contrato nos títulos')}${select('model','Modelo',[{id:'A',name:'A — Comissão por êxito'},{id:'B',name:'B — Gestão recorrente'}])}${input('starts_on','Início',today,'date')}${input('ends_on','Término (vigência sugerida de 90 dias)',new Date(Date.parse(today+'T12:00:00Z')+89*86400000).toISOString().slice(0,10),'date')}${select('volume_discount','Desconto por volume',[{id:'auto',name:'Padrão do modelo'},{id:'true',name:'Ativado'},{id:'false',name:'Desativado'}])}${select('snapshot_policy','Política de volume',[{id:'first_financial_operation',name:'Congelar na primeira operação financeira'},{id:'explicit_month_start',name:'Exigir snapshot explícito no início da competência'}])}${input('corporate_discount','Desconto corporativo (pontos percentuais)','4','number')}${bands.map((l,i)=>input('rate_'+i,'Comissão '+l,[10,15,20,25,30][i],'number')).join('')}${volumes.map((l,i)=>input('minimum_'+i,'Mínimo '+l,[590,990,1990,4990,8990][i],'number')).join('')}${select('recipient','Recebimentos pagos a',[{id:'creditor',name:'Diretamente ao credor — honorários a faturar'},{id:'agency',name:'Assessoria — retenção e repasse'}])}${input('post_end_days','Comissão após encerramento (dias)','0','number')}${input('payment_terms','Condições de pagamento')}${input('commercial_owner','Responsável comercial')}${input('finance_owner','Responsável financeiro')}${input('closing_day','Dia de conferência mensal','5','number')}`,async d=>api.rpc('pricing_contract',{...d,volume_discount:d.volume_discount==='auto'?d.model==='B':d.volume_discount==='true',rates:bands.map((_,i)=>d['rate_'+i]),minimums:volumes.map((_,i)=>d['minimum_'+i]),terms:{snapshot_policy:d.snapshot_policy,recipient:d.recipient,post_end_days:d.post_end_days,payment_terms:d.payment_terms,commercial_owner:d.commercial_owner,finance_owner:d.finance_owner,closing_day:d.closing_day}})));
+
+  const configured=(c)=>({overdue:(c?.terms?.overdue_cutoffs||[30,90,180,365]).map(Number),volume:(c?.terms?.volume_cutoffs||[100,500,2000,5000]).map(Number),discount:(c?.terms?.volume_discounts||[0,1,2,3,c?.corporate_discount??4]).map(Number),floor:Number(c?.terms?.minimum_fee_rate??8)});
+  const nint=(name,label,value,max)=>`<label>${esc(label)}<input name="${name}" type="number" min="1" max="${max}" step="1" value="${esc(value)}" required></label>`;
+  const editContract=(base=null)=>{
+   const set=configured(base),rates=base?.rates||[10,15,20,25,30],minimums=base?.minimums||[590,990,1990,4990,8990];
+   const volumeLabels=set.volume.map((cut,i)=>i===0?`Até ${cut-1}`: `${set.volume[i-1]} a ${cut-1}`).concat(`${set.volume[3]} ou mais`);
+   const ageLabels=set.overdue.map((cut,i)=>i===0?`1 a ${cut} dias`: `${set.overdue[i-1]+1} a ${cut} dias`).concat(`Acima de ${set.overdue[3]} dias`);
+   const dialog=modal(base?'Nova versão das condições de '+base.creditor_name:'Condições financeiras do contrato',
+     `<p>Todas as taxas, limites, descontos e valores podem ser configurados por contrato. Salvar cria uma <strong>nova versão</strong>; não recalcula títulos classificados, recebimentos, snapshots ou fechamentos anteriores. Alterações com competências congeladas somente terão vigência futura.</p>
+     ${select('creditor_id','Credor',lookups.creditors)}
+     ${input('contract_ref','Referência exata do contrato nos títulos',base?.contract_ref||'')}
+     ${select('model','Modelo',[{id:'A',name:'A — Comissão por êxito'},{id:'B',name:'B — Gestão recorrente'}])}
+     ${input('starts_on','Início de vigência desta versão',today,'date')}
+     ${input('ends_on','Término da vigência',base?.ends_on||new Date(Date.parse(today+'T12:00:00Z')+89*86400000).toISOString().slice(0,10),'date')}
+     ${select('volume_discount','Aplicar desconto por volume',[{id:'true',name:'Sim'},{id:'false',name:'Não'}])}
+     ${select('snapshot_policy','Política de volume',[{id:'first_financial_operation',name:'Congelar na primeira operação financeira'},{id:'explicit_month_start',name:'Exigir snapshot explícito no início da competência'}])}
+     <h3>Limites de atraso — editáveis (dias)</h3>
+     <p>Defina 4 limites crescentes. São formadas 5 faixas; a última aplica-se acima do 4º limite.</p>
+     ${set.overdue.map((v,i)=>nint('age_limit_'+i,'Limite superior da faixa '+(i+1)+' (dias)',v,36500)).join('')}
+     <h3>Taxa percentual de honorários por faixa</h3>
+     ${ageLabels.map((l,i)=>input('rate_'+i,'Taxa-base '+l+' (%)',rates[i],'number')).join('')}
+     ${input('minimum_fee_rate','Piso percentual de honorários (%)',set.floor,'number')}
+     <h3>Faixas de volume de devedores — editáveis</h3>
+     <p>Defina 4 inícios crescentes de volume. A primeira faixa é inferior ao 1º limite.</p>
+     ${set.volume.map((v,i)=>nint('volume_limit_'+i,'Início da faixa '+(i+2)+' (devedores)',v,100000000)).join('')}
+     <h3>Desconto por faixa de volume — pontos percentuais</h3>
+     ${volumeLabels.map((l,i)=>input('volume_discount_'+i,'Desconto '+l+' (p.p.)',set.discount[i],'number')).join('')}
+     <h3>Mínimo mensal de gestão por faixa — R$</h3>
+     ${volumeLabels.map((l,i)=>input('minimum_'+i,'Mínimo '+l,minimums[i],'number')).join('')}
+     ${select('recipient','Recebimentos pagos a',[{id:'creditor',name:'Diretamente ao credor — honorários a faturar'},{id:'agency',name:'Assessoria — retenção e repasse'}])}
+     ${nint('post_end_days','Dias após encerramento para comissão',base?.terms?.post_end_days??0,3650).replace('min="1"','min="0"')}
+     ${input('payment_terms','Condições de pagamento',base?.terms?.payment_terms||'')}
+     ${input('commercial_owner','Responsável comercial',base?.terms?.commercial_owner||'')}
+     ${input('finance_owner','Responsável financeiro',base?.terms?.finance_owner||'')}
+     ${nint('closing_day','Dia de conferência mensal',base?.terms?.closing_day??5,31)}`,
+     async d=>{
+       const age=Array.from({length:4},(_,i)=>Number(d['age_limit_'+i])),volume=Array.from({length:4},(_,i)=>Number(d['volume_limit_'+i]));
+       const discounts=Array.from({length:5},(_,i)=>Number(d['volume_discount_'+i]));
+       const rateValues=Array.from({length:5},(_,i)=>Number(d['rate_'+i]));
+       const amounts=Array.from({length:5},(_,i)=>Number(d['minimum_'+i]));
+       const floor=Number(d.minimum_fee_rate);
+       const ascending=list=>list.every((v,i)=>Number.isSafeInteger(v)&&v>0&&(i===0||v>list[i-1]));
+       const percent=v=>Number.isFinite(v)&&v>=0&&v<=100&&Math.round(v*100)===v*100;
+       if(!ascending(age)||!ascending(volume))throw Error('Os limites de atraso e volume devem ser inteiros, positivos e crescentes.');
+       if(!rateValues.every(percent)||!discounts.every(percent)||!percent(floor))throw Error('Informe taxas e descontos de 0 a 100%, com duas casas decimais.');
+       if(!amounts.every(v=>Number.isFinite(v)&&v>=0&&v<=999999999.99&&Math.round(v*100)===v*100))throw Error('Mínimos inválidos: informe valores monetários não negativos.');
+       if(d.starts_on>d.ends_on)throw Error('O início da vigência deve ser anterior ou igual ao término.');
+       await api.rpc('pricing_contract',{creditor_id:d.creditor_id,contract_ref:d.contract_ref,model:d.model,starts_on:d.starts_on,ends_on:d.ends_on,volume_discount:d.volume_discount==='true',corporate_discount:discounts[4],rates:rateValues,minimums:amounts,terms:{snapshot_policy:d.snapshot_policy,recipient:d.recipient,post_end_days:d.post_end_days,payment_terms:d.payment_terms,commercial_owner:d.commercial_owner,finance_owner:d.finance_owner,closing_day:d.closing_day,overdue_cutoffs:age,volume_cutoffs:volume,volume_discounts:discounts,minimum_fee_rate:floor}});
+     });
+   if(base){
+     for(const [name,value] of Object.entries({creditor_id:base.creditor_id,model:base.model,volume_discount:String(base.volume_discount),snapshot_policy:base.terms?.snapshot_policy||'first_financial_operation',recipient:base.terms?.recipient||'creditor'})){
+       const control=dialog.querySelector('[name="'+name+'"]');if(control)control.value=value;
+     }
+   }else{
+     dialog.querySelector('[name=volume_discount]').value='false';
+     dialog.querySelector('[name=snapshot_policy]').value='first_financial_operation';
+     dialog.querySelector('[name=recipient]').value='creditor';
+   }
+  };
+  on('new',()=>editContract());
+  for(const c of data.contracts)on('version:'+c.id,()=>editContract(c));
   for(const c of data.contracts)on('import:'+c.id,()=>{const dialog=modal('Importar carteira — prévia',input('batch_id','Identificador único do lote')+'<p>CSV UTF-8: external_ref,debtor_name,debtor_document,original_amount,due_date; opcional entry_date. Datas AAAA-MM-DD e valores decimais com ponto. Cada referência é um título; CPF/CNPJ repetido pode ter títulos diferentes. Até 500 títulos por lote.</p><label>Arquivo<input name="portfolio_file" type="file" accept=".csv,text/csv" required></label>',async d=>{const file=dialog.querySelector('[name=portfolio_file]').files[0];if(!file||file.size>1048576)throw Error('Selecione um CSV de até 1 MB.');const items=parseCsv(await file.text(),['external_ref','debtor_name','debtor_document','original_amount','due_date']);const args={contract_id:c.id,batch_id:d.batch_id,items};const preview=await api.rpc('pricing_import',args);modal('Conferir importação',`<p>${preview.count} títulos · ${preview.errors} pendências. ${preview.duplicate?'Lote já importado.':''}</p>${table(preview.rows,[['line','Linha'],['external_ref','Título'],['due_date','Vencimento'],['reference_date','Entrada'],['band','Faixa'],['duplicate','Duplicado'],['status','Situação'],['error','Pendência']])}`,preview.errors||preview.duplicate?null:()=>api.rpc('pricing_import',{...args,operation:'confirm'}));});});
   for(const c of data.contracts)on('enroll:'+c.id,async()=>{const preview=await api.rpc('pricing_enroll',{contract_id:c.id});const rows=preview.rows.map(r=>({...r,band_label:Number(r.band)===0?'Não vencido':bands[Number(r.band)-1]||'Pendente',base_rate:feeBaseForBand(c.rates,r.band)}));modal('Prévia de taxas escalonadas por título',`<p>Os títulos serão enquadrados pelo vencimento original na data de entrada. Taxas-base do contrato: ${esc(c.rates.join(' / '))}% para 1–30, 31–90, 91–180, 181–365 e acima de 365 dias. Sobre o efetivamente recebido, o banco aplica ainda o desconto por volume da competência e o piso contratado. Esta prévia não lança honorários nem juros do devedor.</p><p>Somente títulos sem recebimentos e sem classificação poderão ser vinculados. Confira a referência contratual antes de confirmar.</p>${table(rows,[['external_ref','Título'],['due_date','Vencimento original'],['reference_date','Entrada'],['band_label','Faixa de atraso'],['base_rate','Taxa-base (%)'],['already_classified','Já classificado'],['historical_payments','Tem recebimentos']])}${input('reason','Motivo da vinculação')}`,d=>api.rpc('pricing_enroll',{contract_id:c.id,operation:'confirm',reason:d.reason}));});return;
  }
