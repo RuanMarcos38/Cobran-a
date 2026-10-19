@@ -30,6 +30,7 @@ await db.exec(await readFile(new URL('../database/011-sectors-api.sql',import.me
 await db.exec(await readFile(new URL('../database/012-private-sector-policies.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/013-financial-ledger-erp.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../database/014-chat-reports.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../database/015-pricing.sql',import.meta.url),'utf8'));
 
 const id='11111111-1111-4111-8111-111111111111';
 
@@ -124,7 +125,7 @@ try{
   for(const section of sections){
    await page.locator(`[data-section="${section}"]`).click();
    await page.waitForFunction(()=>document.querySelector('#content').children.length>0);
-   await page.locator('[data-action=refresh],[data-fin=refresh],[data-sector=refresh],[data-portfolio-refresh]').click();
+   await page.locator('[data-action=refresh],[data-fin=refresh],[data-sector=refresh],[data-portfolio-refresh],[data-fee=refresh]').click();
    if(await page.locator('[data-action=export]').count()){const dl=page.waitForEvent('download');await page.locator('[data-action=export]').click();assert.equal((await dl).suggestedFilename(),'cobranca.csv');}
    if(await page.locator('#report-filter').count()){
     await page.locator('#report-filter [name=start]').fill('2026-01-01');await page.locator('#report-filter [name=end]').fill('2026-12-31');await page.locator('#report-filter button').click();
@@ -159,10 +160,10 @@ try{
  await page.locator('[data-section="Carteiras de credores"]').click();await page.getByLabel('Carteira do credor').selectOption({index:1});await page.locator('[data-open-wallet]').waitFor();await page.locator('[data-open-wallet]').click();assert.ok(await page.locator('#filters [name=creditor_id]').inputValue());assert.equal(await page.locator('#filters [name=scope]').inputValue(),'Todos');
  console.log('PASS operations UI: commission rule, automatic distribution, integration key creation and revocation.');
 
- await page.locator('[data-module=Processo]').click();await page.locator('[data-action=new]').click();const due=new Date();due.setUTCDate(due.getUTCDate()-30);
+ await page.locator('[data-module=Processo]').click();await page.locator('[data-action=new]').click();const due=new Date((await db.query("select (current_date-30)::text d")).rows[0].d+'T12:00:00Z');
  await page.locator('dialog [name=external_ref]').fill('UI-CHARGES');await page.locator('dialog [name=original_amount]').fill('100.00');await page.locator('dialog [name=due_date]').fill(due.toISOString().slice(0,10));await page.locator('dialog [name=contract_ref]').fill('UI-CONTRACT');await page.locator('dialog [name=financial_mode]').selectOption('monthly');await page.locator('dialog [name=interest_percent]').fill('3');await page.locator('dialog [name=fine_percent]').fill('2');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.locator('[data-row]').filter({hasText:'UI-CHARGES'}).click();await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('105,00'));
  await page.locator('[data-action=contract]').click();await page.locator('dialog [name=financial_mode]').selectOption('daily');await page.locator('dialog [name=interest_percent]').fill('1');await page.locator('dialog [name=fine_percent]').fill('0');await page.locator('dialog [name=grace_days]').fill('5');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('125,00'));
- await page.locator('[data-action=payment]').click();await page.locator('dialog [name=amount]').fill('125.00');await page.locator('dialog [name=reference]').fill('UI-CHARGES-PAID');await page.locator('dialog [name=paid_date]').fill(new Date().toISOString().slice(0,10));await page.locator('dialog [name=reason]').fill('Quitação com encargos');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('Quitado'));
+ await page.locator('[data-action=payment]').click();await page.locator('dialog [name=amount]').fill('125.00');await page.locator('dialog [name=reference]').fill('UI-CHARGES-PAID');await page.locator('dialog [name=paid_date]').fill((await db.query('select current_date::text d')).rows[0].d);await page.locator('dialog [name=reason]').fill('Quitação com encargos');await page.locator('dialog [type=submit]').click();await page.locator('dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#content').textContent.includes('Quitado'));
  assert.match(await page.locator('#message').innerText(),/^$|^Conexão desativada\.$/);
  await page.getByRole('button',{name:'Sair',exact:true}).click();await page.locator('#login').waitFor();
 
