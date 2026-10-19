@@ -25,3 +25,6 @@ export async function server(operation,payload={}){
  const r=await fetch('/api/v1/'+operation,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify(payload)});const data=await r.json();
  if(epoch!==sessionEpoch)throw Error('A sessão foi alterada. Entre novamente.');if(!r.ok)throw Error(data.error||'Operação rejeitada');return data.data;
 }
+
+export async function improve(action,payload={}){await rpc('profile');return request('/rest/v1/rpc/cobranca_improvements',{method:'POST',body:JSON.stringify({action,payload})});}
+export async function changePassword(password){await rpc('profile');return request('/auth/v1/user',{method:'PUT',body:JSON.stringify({password})});}

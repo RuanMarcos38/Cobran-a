@@ -98,3 +98,13 @@ html[data-theme=dark] .chat-contacts button{border-color:#26343c}html[data-theme
 /* Prévia de cobrança: mantém quebras e evita texto fora da tela. */
 .email-preview{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.6;grid-column:1/-1;padding:16px;border:1px solid var(--border,#cbd5e1);border-radius:8px}
 [hidden]{display:none!important}
+
+/* Text and form fields keep native selection and clipboard shortcuts. */
+body,p,span,strong,small,td,th,input,textarea,[contenteditable=true]{-webkit-user-select:text;user-select:text}
+.password-toggle{margin:5px 0;align-self:start;white-space:nowrap}
+.drag-handle{display:block;font-size:11px;cursor:grab;color:var(--muted,#52647c)}
+.opportunity.dragging{opacity:.45}.kanban-column.drop-target{outline:2px solid #2563eb;outline-offset:-2px}
+.kanban-column{min-height:240px}.opportunity textarea{max-width:100%}
+[data-email-config-error]{color:#b91c1c;white-space:pre-wrap}
+
+.booking-page{max-width:780px;margin:40px auto;padding:24px}.booking-page form{display:grid;gap:18px}.booking-page label{display:grid;gap:8px}.booking-page input,.booking-page select{padding:12px;width:100%;max-width:100%}.whatsapp-qr{max-width:280px;width:100%;height:auto;background:white;padding:12px}
