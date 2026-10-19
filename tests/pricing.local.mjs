@@ -135,7 +135,7 @@ for(const [count,band]of [[1,1],[2,2],[4,2],[5,3],[7,3],[8,4],[10,4],[11,5]]){
  const x=await raw('select cobranca_private.fee_volume_band_config($1,$2::jsonb) band',[count,JSON.stringify(terms.volume_cutoffs)]);assert.equal(x.rows[0].band,band);
 }
 await as(admin);
-for(const invalidTerms of [{...terms,overdue_cutoffs:[7,5,45,120]},{...terms,volume_discounts:[0,2,4,-1,9]},{...terms,minimum_fee_rate:101}]){
+for(const invalidTerms of [{...terms,overdue_cutoffs:[7,5,45,120]},{...terms,overdue_cutoffs:[7,null,45,120]},{...terms,volume_cutoffs:[2,5,null,11]},{...terms,volume_discounts:[0,2,4,-1,9]},{...terms,volume_discounts:[0,2,null,6,9]},{...terms,minimum_fee_rate:101}]){
  await assert.rejects(()=>rpc('pricing_contract',{creditor_id:creditor,contract_ref:'INVALID-CUSTOM',model:'B',starts_on:'2026-01-01',ends_on:'2027-12-31',rates:[4,8,12,16,22],terms:invalidTerms}));
 }
 const largerDiscount=await rpc('pricing_contract',{creditor_id:creditor,contract_ref:'CUSTOM-CORPORATE',model:'B',starts_on:'2026-01-01',ends_on:'2027-12-31',rates:[4,8,12,16,22],minimums:[100,200,300,400,500],volume_discount:true,terms:{...terms,volume_discounts:[0,2,4,6,35]}});
