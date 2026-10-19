@@ -138,6 +138,10 @@ await as(admin);
 for(const invalidTerms of [{...terms,overdue_cutoffs:[7,5,45,120]},{...terms,volume_discounts:[0,2,4,-1,9]},{...terms,minimum_fee_rate:101}]){
  await assert.rejects(()=>rpc('pricing_contract',{creditor_id:creditor,contract_ref:'INVALID-CUSTOM',model:'B',starts_on:'2026-01-01',ends_on:'2027-12-31',rates:[4,8,12,16,22],terms:invalidTerms}));
 }
+const largerDiscount=await rpc('pricing_contract',{creditor_id:creditor,contract_ref:'CUSTOM-CORPORATE',model:'B',starts_on:'2026-01-01',ends_on:'2027-12-31',rates:[4,8,12,16,22],minimums:[100,200,300,400,500],volume_discount:true,terms:{...terms,volume_discounts:[0,2,4,6,35]}});
+assert.equal(Number(largerDiscount.corporate_discount),35);
+const largeConfigured=await rpc('pricing_simulate',{creditor_id:creditor,contract_id:largerDiscount.id,model:'B',debtors:12,titles:12,recovery_percent:100,bands:[1000,0,0,0,0],cost:0});
+assert.equal(largeConfigured.discount,35);assert.equal(largeConfigured.rows[0].rate,1);
 assert.deepEqual((await rpc('pricing_list')).contracts.find(c=>c.id===contract.id).rates,[10,15,20,25,30]);
 console.log('PASS pricing: exact commercial examples; age and volume boundaries; CPF/CNPJ; installments; partial/pre-due payments; immutable legacy; approval/replay; compensated reversal; permissions and tenant isolation. No billing or transfers.');
 if(process.env.PRICING_UI==='1'){await as(admin);await (await import('./pricing-ui.mjs')).runPricingUi({db,admin,creditor,contract:contractB});}
