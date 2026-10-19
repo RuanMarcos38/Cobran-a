@@ -99,7 +99,7 @@ begin
    if payload->'terms' ? 'overdue_cutoffs' then
     if jsonb_typeof(payload->'terms'->'overdue_cutoffs')<>'array' or jsonb_array_length(payload->'terms'->'overdue_cutoffs')<>4 then raise exception 'Informe quatro limites de dias';end if;
     for i in 0..3 loop
-     if (payload->'terms'->'overdue_cutoffs'->>i)::numeric not between 1 and 36500 or (payload->'terms'->'overdue_cutoffs'->>i)::numeric<>trunc((payload->'terms'->'overdue_cutoffs'->>i)::numeric)
+     if coalesce((payload->'terms'->'overdue_cutoffs'->>i)::numeric,-1) not between 1 and 36500 or (payload->'terms'->'overdue_cutoffs'->>i)::numeric<>trunc((payload->'terms'->'overdue_cutoffs'->>i)::numeric)
         or (i>0 and (payload->'terms'->'overdue_cutoffs'->>i)::numeric<=(payload->'terms'->'overdue_cutoffs'->>(i-1))::numeric)
      then raise exception 'Limites de dias devem ser inteiros e crescentes';end if;
     end loop;
@@ -107,7 +107,7 @@ begin
    if payload->'terms' ? 'volume_cutoffs' then
     if jsonb_typeof(payload->'terms'->'volume_cutoffs')<>'array' or jsonb_array_length(payload->'terms'->'volume_cutoffs')<>4 then raise exception 'Informe quatro limites de volume';end if;
     for i in 0..3 loop
-     if (payload->'terms'->'volume_cutoffs'->>i)::numeric not between 1 and 100000000 or (payload->'terms'->'volume_cutoffs'->>i)::numeric<>trunc((payload->'terms'->'volume_cutoffs'->>i)::numeric)
+     if coalesce((payload->'terms'->'volume_cutoffs'->>i)::numeric,-1) not between 1 and 100000000 or (payload->'terms'->'volume_cutoffs'->>i)::numeric<>trunc((payload->'terms'->'volume_cutoffs'->>i)::numeric)
         or (i>0 and (payload->'terms'->'volume_cutoffs'->>i)::numeric<=(payload->'terms'->'volume_cutoffs'->>(i-1))::numeric)
      then raise exception 'Limites de volume devem ser inteiros e crescentes';end if;
     end loop;
@@ -115,7 +115,7 @@ begin
    if payload->'terms' ? 'volume_discounts' then
     if jsonb_typeof(payload->'terms'->'volume_discounts')<>'array' or jsonb_array_length(payload->'terms'->'volume_discounts')<>5 then raise exception 'Informe cinco descontos por volume';end if;
     for i in 0..4 loop
-     if (payload->'terms'->'volume_discounts'->>i)::numeric not between 0 and 100 or (payload->'terms'->'volume_discounts'->>i)::numeric<>round((payload->'terms'->'volume_discounts'->>i)::numeric,2)
+     if coalesce((payload->'terms'->'volume_discounts'->>i)::numeric,-1) not between 0 and 100 or (payload->'terms'->'volume_discounts'->>i)::numeric<>round((payload->'terms'->'volume_discounts'->>i)::numeric,2)
       then raise exception 'Descontos: de 0 a 100 pontos percentuais e duas casas';end if;
     end loop;
    end if;
