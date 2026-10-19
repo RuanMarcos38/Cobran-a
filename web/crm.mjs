@@ -1,4 +1,5 @@
 import {renderChat} from './chat.mjs';
+import {renderScheduleConnection,localDateTime,schedulePayload,scheduleAutoRefresh,stopScheduleRefresh} from './scheduling.mjs';
 import {brl} from './money.mjs';
 const stages=['Prospecção','Contato','Proposta','Negociação','Ganho','Perdido'];
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -6,6 +7,8 @@ const field=(name,label,value='',type='text',required=true)=>`<label>${esc(label
 const choose=(name,label,options,value)=>`<label>${esc(label)}<select name="${name}">${options.map(o=>{const id=typeof o==='string'?o:o.id,label=typeof o==='string'?o:o.name;return `<option value="${esc(id)}" ${String(id)===String(value)?'selected':''}>${esc(label)}</option>`;}).join('')}</select></label>`;
 const table=(rows,cols)=>`<div class=table-wrap><table><thead><tr>${cols.map(([k,l])=>`<th>${esc(l)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(([k])=>`<td>${esc(['amount','base_amount'].includes(k)?brl(r[k]):r[k])}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${cols.length}">Nenhum registro encontrado.</td></tr>`}</tbody></table></div>`;
 export async function renderSector(section,{api,modal,guard,notify,navigate},target){
+ stopScheduleRefresh();
+ if(section==='Integração n8n')return renderScheduleConnection({api,modal,guard,notify},target);
  const again=()=>renderSector(section,{api,modal,guard,notify,navigate},target);
  const btn=(id,label)=>`<button data-sector="${id}">${esc(label)}</button>`;
  const on=(id,fn)=>target.querySelector(`[data-sector="${id}"]`)?.addEventListener('click',()=>guard(fn));
@@ -21,9 +24,10 @@ export async function renderSector(section,{api,modal,guard,notify,navigate},tar
  }
  if(section==='Agendamentos'){
   const [d,opps]=await Promise.all([api.rpc('crm_tasks',{}),api.rpc('crm_list',{})]);
-  target.innerHTML=`<div class=toolbar>${btn('new','Novo agendamento')}${btn('refresh','Atualizar')}</div><div class=panel>${d.rows.map(r=>`<article class=task><strong>${esc(r.name)}</strong><p>${esc(new Date(r.due_at).toLocaleString('pt-BR'))} · ${esc(r.status)}</p>${btn('edit:'+r.id,'Editar agendamento')}</article>`).join('')||'<p>Nenhum agendamento encontrado.</p>'}</div>`;
-  const edit=r=>modal('Agendamento comercial',field('name','Atividade',r.name)+field('due_at','Data e hora',r.due_at?.slice(0,16),'datetime-local')+choose('status','Situação',['Aberto','Concluído','Cancelado'],r.status||'Aberto')+choose('owner_id','Responsável',opps.users,r.owner_id)+choose('opportunity_id','Oportunidade',[{id:'',name:'Sem vínculo'},...opps.rows.map(o=>({id:o.id,name:o.name}))],r.opportunity_id),data=>api.rpc('crm_tasks',{operation:'save',id:r.id,...data}));
-  on('new',()=>edit({}));on('refresh',again);for(const r of d.rows)on('edit:'+r.id,()=>edit(r));return;
+  const displayDate=value=>new Date(value).toLocaleString('pt-BR');
+  target.innerHTML=`<div class=toolbar>${btn('new','Novo agendamento')}${btn('refresh','Atualizar')}</div><div class=panel data-schedule-agenda><p class=muted>Atualização automática a cada 15 segundos · fuso ${esc(Intl.DateTimeFormat().resolvedOptions().timeZone)} · conferido às ${esc(new Date().toLocaleTimeString('pt-BR'))}</p>${d.rows.map(r=>`<article class=task><strong>${esc(r.name)}</strong><p>${esc(displayDate(r.due_at))} até ${esc(displayDate(r.end_at||new Date(new Date(r.due_at).getTime()+1800000)))} · ${esc(r.status)} · ${r.source==='n8n'?'Sincronizado com n8n':'Cadastro manual'}</p><p>${esc(r.company)} ${esc(r.contact_name)} · ${esc(opps.users.find(u=>u.id===r.owner_id)?.name||'Responsável comercial')}</p><p>${esc(r.contact_email)} ${esc(r.contact_phone)}</p>${r.meeting_url?.startsWith('https://')?`<a href="${esc(r.meeting_url)}" target=_blank rel="noopener noreferrer">Entrar na call</a>`:''}<p>${esc(r.notes)}</p>${btn('edit:'+r.id,'Editar agendamento')}</article>`).join('')||'<p>Nenhum agendamento encontrado.</p>'}</div>`;
+  const edit=r=>modal('Agendamento comercial',field('name','Atividade',r.name)+field('due_at','Início da call',localDateTime(r.due_at),'datetime-local')+field('end_at','Fim da call',localDateTime(r.end_at||r.due_at&&new Date(new Date(r.due_at).getTime()+1800000)),'datetime-local')+choose('status','Situação',['Aberto','Concluído','Cancelado'],r.status||'Aberto')+choose('owner_id','Responsável',opps.users,r.owner_id)+choose('opportunity_id','Oportunidade',[{id:'',name:'Sem vínculo'},...opps.rows.map(o=>({id:o.id,name:o.name}))],r.opportunity_id)+field('company','Empresa',r.company,'text',false)+field('contact_name','Contato',r.contact_name,'text',false)+field('contact_email','E-mail do contato',r.contact_email,'email',false)+field('contact_phone','Telefone do contato',r.contact_phone,'tel',false)+field('meeting_url','Link da call (HTTPS)',r.meeting_url,'url',false)+field('notes','Observações',r.notes,'text',false),data=>api.rpc('crm_tasks',{operation:'save',id:r.id,version:r.version,...schedulePayload(data)}));
+  on('new',()=>edit({}));on('refresh',again);for(const r of d.rows)on('edit:'+r.id,()=>edit(r));scheduleAutoRefresh(target,again,guard);return;
  }
  if(['Comissões comerciais','Regras de comissão'].includes(section)){
   const admin=section==='Regras de comissão',d=await api.rpc(admin?'ops_commissions':'crm_commissions',{});

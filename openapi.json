@@ -164,11 +164,11 @@
           "200": {
             "description": "Resultado em data"
           },
-          "401": {
-            "description": "Sessão ausente ou expirada"
-          },
           "400": {
             "description": "Validação ou permissão rejeitada pelo backend"
+          },
+          "401": {
+            "description": "Sessão ausente ou expirada"
           }
         }
       }
@@ -238,6 +238,111 @@
           },
           "401": {
             "description": "Chave ausente"
+          }
+        }
+      }
+    },
+    "/api/v1/commercial_schedule": {
+      "post": {
+        "summary": "Sincronizar calls com a agenda comercial",
+        "security": [
+          {
+            "IntegrationKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "operation"
+                ],
+                "properties": {
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "health",
+                      "lookup",
+                      "list",
+                      "upsert"
+                    ]
+                  },
+                  "event_id": {
+                    "type": "string"
+                  },
+                  "external_id": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "expected_version": {
+                    "type": "integer"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "due_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "end_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "Aberto",
+                      "Concluído",
+                      "Cancelado"
+                    ]
+                  },
+                  "company": {
+                    "type": "string"
+                  },
+                  "contact_name": {
+                    "type": "string"
+                  },
+                  "contact_email": {
+                    "type": "string"
+                  },
+                  "contact_phone": {
+                    "type": "string"
+                  },
+                  "meeting_url": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": "string"
+                  },
+                  "cursor_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "cursor_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evento aceito, repetido ou consulta autorizada"
+          },
+          "400": {
+            "description": "Dados inválidos"
+          },
+          "401": {
+            "description": "Chave ausente ou inválida"
+          },
+          "409": {
+            "description": "Conflito de versão ou horário"
           }
         }
       }
