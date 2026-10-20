@@ -15,7 +15,7 @@ export async function renderSector(section,{api,modal,guard,notify,navigate},tar
  const btn=(id,label)=>`<button data-sector="${id}">${esc(label)}</button>`;
  const on=(id,fn)=>target.querySelector(`[data-sector="${id}"]`)?.addEventListener('click',()=>guard(fn));
  const showOpportunity=(o,users)=>modal(o.id?'Editar oportunidade':'Nova oportunidade',field('name','Empresa / oportunidade',o.name)+field('document','Documento',o.document,'text',false)+field('email','E-mail',o.email,'email',false)+field('phone','Telefone',o.phone,'tel',false)+choose('stage','Etapa do funil',stages,o.stage||stages[0])+field('amount','Valor da proposta',o.amount||'0','number')+field('contract_ref','Contrato',o.contract_ref,'text',false)+choose('owner_id','Responsável comercial',users,o.owner_id)+field('source','Origem',o.source,'text',false)+field('notes','Observações',o.notes,'text',false),data=>api.rpc('crm_save',{...data,id:o.id,version:o.version}));
- if(section==='Atendimento')return renderAttendance({api,modal,guard,notify},target);
+ if(section==='Atendimento')return renderAttendance({api,modal,guard,notify,channel:'whatsapp',sector:'commercial'},target);
  if(['Prospecção','Funil / Kanban'].includes(section)){
   const d=await api.rpc('crm_list',{}),rows=d.rows;
   target.innerHTML=`<div class=toolbar>${btn('new','Nova oportunidade')}${btn('refresh','Atualizar')}<label>Pesquisar <input id=crm-search type=search aria-label="Pesquisar oportunidades"></label></div><div class=panel><div class=metrics>${[['Oportunidades',rows.length],['Em negociação',rows.filter(x=>x.stage==='Negociação').length],['Vendas ganhas',brl(rows.filter(x=>x.stage==='Ganho').reduce((s,x)=>s+Number(x.amount),0))]].map(([l,v])=>`<div class=metric><span>${l}</span><strong>${v}</strong></div>`).join('')}</div><div class=kanban>${stages.map(stage=>`<section class=kanban-column><h3>${stage}<span>${rows.filter(r=>r.stage===stage).length}</span></h3>${rows.filter(r=>r.stage===stage).map(o=>`<article class=opportunity data-opportunity="${o.id}"><strong>${esc(o.name)}</strong><p>${brl(o.amount)}</p><small>${esc(o.phone||o.email||'Sem contato cadastrado')}</small><div>${btn('edit:'+o.id,'Editar')}${btn('attend:'+o.id,'Atender')}</div><label>Etapa<select aria-label="Etapa de ${esc(o.name)}" data-move="${o.id}">${stages.map(s=>`<option ${s===o.stage?'selected':''}>${s}</option>`).join('')}</select></label></article>`).join('')||'<p class=muted>Sem oportunidades.</p>'}</section>`).join('')}</div></div>`;
@@ -52,5 +52,4 @@ export async function renderSector(section,{api,modal,guard,notify,navigate},tar
  }
 
 }
-
 
