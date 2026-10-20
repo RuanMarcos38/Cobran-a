@@ -15,6 +15,7 @@ export async function renderSector(section,{api,modal,guard,notify,navigate},tar
  const btn=(id,label)=>`<button data-sector="${id}">${esc(label)}</button>`;
  const on=(id,fn)=>target.querySelector(`[data-sector="${id}"]`)?.addEventListener('click',()=>guard(fn));
  const showOpportunity=(o,users)=>modal(o.id?'Editar oportunidade':'Nova oportunidade',field('name','Empresa / oportunidade',o.name)+field('document','Documento',o.document,'text',false)+field('email','E-mail',o.email,'email',false)+field('phone','Telefone',o.phone,'tel',false)+choose('stage','Etapa do funil',stages,o.stage||stages[0])+field('amount','Valor da proposta',o.amount||'0','number')+field('contract_ref','Contrato',o.contract_ref,'text',false)+choose('owner_id','Responsável comercial',users,o.owner_id)+field('source','Origem',o.source,'text',false)+field('notes','Observações',o.notes,'text',false),data=>api.rpc('crm_save',{...data,id:o.id,version:o.version}));
+ if(section==='E-mail comercial')return renderAttendance({api,modal,guard,notify,channel:'email',sector:'commercial'},target);
  if(section==='Atendimento')return renderAttendance({api,modal,guard,notify,channel:'whatsapp',sector:'commercial'},target);
  if(['Prospecção','Funil / Kanban'].includes(section)){
   const d=await api.rpc('crm_list',{}),rows=d.rows;
