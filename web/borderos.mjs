@@ -34,5 +34,5 @@ const labels={creditor_name:'Credor',creditor_document:'CNPJ do credor',debtor_n
 
 export function borderoDetails(process){
  const m=process?.metadata;if(!m?.file_bordero)return '';const values=m.original_fields||{};
- return `<details><summary>Dados do borderô importado</summary><div class="detail-grid">${Object.entries(values).filter(([k,v])=>labels[k]&&v!==null&&v!=='').map(([k,v])=>`<div><small>${esc(labels[k])}</small><strong>${esc(v)}</strong></div>`).join('')}</div></details>`;
+ return `<details><summary>Dados do borderô importado</summary><div class="detail-grid">${Object.entries(values).filter(([k,v])=>v!==null&&v!=='').map(([k,v])=>`<div><small>${esc(labels[k]||k)}</small><strong>${esc(v)}</strong></div>`).join('')}</div></details>`;
 }
