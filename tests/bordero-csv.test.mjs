@@ -52,6 +52,14 @@ test('colunas desconhecidas são preservadas e duplicidades de campos bloqueiam 
  assert.ok(duplicate.errors.some(e=>/Colunas duplicadas para due_date/.test(e.error)));
 });
 
+test('prévia bloqueia credor divergente antes da confirmação de importação',()=>{
+ const bytes=file([header,row()]);
+ assert.equal(parseBorderoCsv(bytes,'modelo.csv',{document:'29037742000173',name:'EMPRESA TESTE LTDA'}).errors.length,0);
+ const wrong=parseBorderoCsv(bytes,'modelo.csv',{document:'11111111111111',name:'OUTRA CARTEIRA'});
+ assert.ok(wrong.errors.some(e=>/CNPJ do arquivo/.test(e.error)));
+ assert.ok(wrong.errors.some(e=>/Nome do credor/.test(e.error)));
+});
+
 
 test('regressão de layout ELISATEX: 14 lançamentos, 24 colunas, CP1252, identificador composto repetido 3 vezes',()=>{
  const refs=['DOC-A','LOTE-B,C','DOC-C','LOTE-B,C','DOC-D','DOC-E','DOC-F','RENEGOCIAÇÃO','LOTE-B,C','DOC-G','DOC-H','DOC-I','DOC-J','DOC-K'];

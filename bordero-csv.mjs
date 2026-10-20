@@ -85,7 +85,7 @@ function normalize(values,source,headers){
   if(external_ref.length>200||r.debtor_name.length>250)throw Error('Nome ou identificação de título excede o limite');
   return {...r,source,external_ref,debtor_document:doc||null,debtor_phone:full?(full.startsWith('55')&&full.length>=12?full:'55'+full):null,debtor_email:r.debtor_email||null,due_date:date(r.due_date),issued_at:date(r.issued_at),original_amount:money(r.original_amount),protest_amount:r.protest_amount?money(r.protest_amount):null,raw,creditor_columns_swapped:reversed};
 }
-export function parseBorderoCsv(bytes,name){
+export function parseBorderoCsv(bytes,name,creditor=null){
   if(!/\.csv$/i.test(name)||!bytes.length||bytes.length>5*1024*1024)throw Error('Arquivo CSV inválido ou maior que 5 MB');
   const {text,encoding}=decode(bytes);
   const first=text.split(/\r?\n/,1)[0]||'';
@@ -132,6 +132,10 @@ export function parseBorderoCsv(bytes,name){
   }
   if(needs_confirmation)warnings.push('O mesmo identificador aparece com diferentes vencimentos. Pode representar renegociação do MESMO débito. Confirme expressamente se devem ser criados títulos separados, para evitar cobrança duplicada.');
   if(rows.length>1000)throw Error('Máximo de 1.000 títulos por arquivo');
+  if(creditor)for(const row of rows){
+    if(row.creditor_document&&digits(row.creditor_document)!==digits(creditor.document))errors.push({source:row.source,error:'CNPJ do arquivo difere do credor selecionado'});
+    if(row.creditor_name&&row.creditor_name.toLowerCase().replace(/\s/g,'')!==String(creditor.name||'').toLowerCase().replace(/\s/g,''))errors.push({source:row.source,error:'Nome do credor no arquivo difere da carteira selecionada'});
+  }
   const sum=rows.reduce((n,r)=>n+BigInt(r.original_amount.replace('.','')),0n);
   const total=(sum/100n).toString()+'.'+String(sum%100n).padStart(2,'0');
   return {rows,errors,warnings,count:rows.length,total,file_name:name,file_hash:createHash('sha256').update(bytes).digest('hex'),needs_confirmation};

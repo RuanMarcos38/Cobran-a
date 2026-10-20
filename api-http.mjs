@@ -27,7 +27,7 @@ export async function handleApi(req,res,env=process.env){
    const creditor=await cred.json();
    if(!cred.ok){send(cred.status,{error:creditor.message||'Não autorizado para a carteira'});return true;}
    const bytes=Buffer.from(f.base64,'base64');
-   send(200,{data:{...parseBorderoCsv(bytes,f.name),creditor}});
+   send(200,{data:{...parseBorderoCsv(bytes,f.name,creditor),creditor}});
   }catch(e){send(400,{error:e.message});}return true;
  }
  if(['booking_link','prospect_booking','public_booking'].includes(operation)){
