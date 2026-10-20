@@ -1,3 +1,4 @@
+import {readMailboxes,imapMessageLocation} from './mail-imap.mjs';
 import {randomUUID} from 'node:crypto';
 import nodemailer from 'nodemailer';
 import {ImapFlow} from 'imapflow';
@@ -27,22 +28,7 @@ export function evolutionMessages(data){
   return {provider_id:x.key.id,provider_ref:x.key.remoteJid,address:x.phoneJid.split('@')[0],name:x.pushName||x.phoneJid.split('@')[0],content:String(x.message?.conversation||x.message?.extendedTextMessage?.text||media?.caption||(media?'[Anexo recebido]':'[Mensagem não textual]')).slice(0,100000),attachments:media?[{index:0,name:media.fileName||(x.message.audioMessage?'audio.ogg':'anexo'),mime:media.mimetype||'application/octet-stream',size:Number(media.fileLength)||0,remote:true}]:[],created_at:new Date(Number(x.messageTimestamp)*1000||Date.now()).toISOString(),from_me:x.key.fromMe===true};
  });
 }
-export async function readInbox(c,createImap=imapClient){
- const client=createImap(c);const messages=[];
- try{
-  await client.connect();const lock=await client.getMailboxLock('INBOX',{readOnly:true});
-  try{
-   const count=client.mailbox.exists;if(!count)return messages;
-   for await(const item of client.fetch(Math.max(1,count-49)+':'+count,{envelope:true,source:true,size:true})){
-    if(!item.source||item.size>5*1024*1024||item.source.length>5*1024*1024)continue;
-    const parsed=await simpleParser(item.source,{skipHtmlToText:false,skipTextToHtml:true,skipImageLinks:true});
-    const from=parsed.from?.value?.[0];if(!from?.address)continue;
-    messages.push({provider_id:'imap:'+String(client.mailbox.uidValidity)+':'+item.uid,address:from.address.toLowerCase(),name:from.name||from.address,subject:String(parsed.subject||'Sem assunto').slice(0,250),content:String(parsed.text||'[E-mail sem texto disponível]').slice(0,100000),html:safeEmailHtml(parsed.html),provider_ref:parsed.messageId||null,created_at:parsed.date?.toISOString()||new Date().toISOString(),attachments:(parsed.attachments||[]).slice(0,20).map((a,index)=>({index,name:a.filename||'anexo',mime:a.contentType,size:a.size})),from_me:false});
-   }
-  }finally{lock.release();}
- }finally{await client.logout().catch(()=>{});}
- return messages;
-}
+export async function readInbox(c,createImap=imapClient){return readMailboxes(c,createImap,safeEmailHtml);}
 export async function handleAttendance(operation,body,rpc,env=process.env){
  const profile=await rpc('app','profile',{});
  const aad=id=>profile.tenant_id+':attendance:'+id;
@@ -106,11 +92,12 @@ export async function handleAttendance(operation,body,rpc,env=process.env){
    if(!base64||base64.length>6990508||!/^[A-Za-z0-9+/]+={0,2}$/.test(base64))throw publicError('Mídia indisponível ou maior que 5 MB.');
    return {base64,mime:file.mimetype||message.attachments?.[0]?.mime||'application/octet-stream',name:file.fileName||message.attachments?.[0]?.name||'anexo'};
   }
-  const parts=String(message.provider_id).match(/^imap:(\d+):(\d+)$/);if(!parts)throw publicError('Identificador do e-mail inválido.');
+  const stored=message.attachments?.[Number(body.index)];if(stored?.base64)return {name:stored.name,mime:stored.mime,base64:stored.base64};
+  let location;try{location=imapMessageLocation(message);}catch{throw publicError('Identificador do e-mail inválido.');}
   const client=imapClient(cfg);try{
-   await client.connect();const lock=await client.getMailboxLock('INBOX',{readOnly:true});try{
-    if(String(client.mailbox.uidValidity)!==parts[1])throw publicError('Caixa postal alterada. Sincronize novamente.');
-    const item=await client.fetchOne(parts[2],{source:true,size:true},{uid:true});if(!item||item.size>5242880||item.source.length>5242880)throw publicError('E-mail ausente ou maior que 5 MB.');
+   await client.connect();const lock=await client.getMailboxLock(location.path,{readOnly:true});try{
+    if(String(client.mailbox.uidValidity)!==location.validity)throw publicError('Caixa postal alterada. Sincronize novamente.');
+    const item=await client.fetchOne(location.uid,{source:true,size:true},{uid:true});if(!item||item.size>5242880||item.source.length>5242880)throw publicError('E-mail ausente ou maior que 5 MB.');
     const parsed=await simpleParser(item.source);const attachment=parsed.attachments[Number(body.index)];if(!attachment||attachment.size>5242880)throw publicError('Anexo indisponível.');
     return {name:attachment.filename||'anexo',mime:attachment.contentType,base64:attachment.content.toString('base64')};
    }finally{lock.release();}
