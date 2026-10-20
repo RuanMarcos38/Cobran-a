@@ -21,11 +21,18 @@ async function evolution(c,path,body){
  const r=await fetch(c.url+path,{method:body?'POST':'GET',headers:{apikey:c.apikey,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.timeout(20000)});
  if(!r.ok)throw publicError('WhatsApp indisponível (HTTP '+r.status+').');return r.json();
 }
+export const validContactName=value=>typeof value==='string'&&value.trim()&&!/^(você|voce|you|me|eu)$/i.test(value.trim())?value.trim().slice(0,250):'';
+export function evolutionContacts(data){
+ const rows=Array.isArray(data)?data:data?.contacts?.records||data?.contacts||data?.records||[];const names=new Map();
+ for(const row of Array.isArray(rows)?rows:[]){const jid=[row.remoteJid,row.remoteJidAlt,row.id].find(j=>typeof j==='string'&&j.endsWith('@s.whatsapp.net'));const name=validContactName(row.name)||validContactName(row.pushName);if(jid&&name)names.set(jid.split('@')[0],name);}return names;
+}
+export function contactThreads(rows,names){return rows.map(t=>({...t,name:names.get(t.address)||validContactName(t.name)||t.address}));}
+async function whatsappNames(cfg){const results=await Promise.allSettled([evolution(cfg,'/chat/findContacts/'+encodeURIComponent(cfg.instance),{where:{}}),evolution(cfg,'/chat/findMessages/'+encodeURIComponent(cfg.instance),{where:{},page:1,offset:100})]);const names=results[0].status==='fulfilled'?evolutionContacts(results[0].value):new Map();if(results[1].status==='fulfilled')for(const m of evolutionMessages(results[1].value))if(m.name!==m.address&&!names.has(m.address))names.set(m.address,m.name);return names;}
 export function evolutionMessages(data){
  const rows=(data?.messages?.records||data?.records||[]).map(x=>({...x,phoneJid:[x.key?.remoteJid,x.key?.remoteJidAlt].find(j=>typeof j==='string'&&j.endsWith('@s.whatsapp.net'))}));
  return rows.filter(x=>x.phoneJid&&x.key?.id).slice(0,100).map(x=>{
   const media=x.message?.imageMessage||x.message?.audioMessage||x.message?.documentMessage;
-  return {provider_id:x.key.id,provider_ref:x.key.remoteJid,address:x.phoneJid.split('@')[0],name:x.pushName||x.phoneJid.split('@')[0],content:String(x.message?.conversation||x.message?.extendedTextMessage?.text||media?.caption||(media?'[Anexo recebido]':'[Mensagem não textual]')).slice(0,100000),attachments:media?[{index:0,name:media.fileName||(x.message.audioMessage?'audio.ogg':'anexo'),mime:media.mimetype||'application/octet-stream',size:Number(media.fileLength)||0,remote:true}]:[],created_at:new Date(Number(x.messageTimestamp)*1000||Date.now()).toISOString(),from_me:x.key.fromMe===true};
+  return {provider_id:x.key.id,provider_ref:x.key.remoteJid,address:x.phoneJid.split('@')[0],name:(x.key.fromMe!==true&&validContactName(x.pushName))||x.phoneJid.split('@')[0],content:String(x.message?.conversation||x.message?.extendedTextMessage?.text||media?.caption||(media?'[Anexo recebido]':'[Mensagem não textual]')).slice(0,100000),attachments:media?[{index:0,name:media.fileName||(x.message.audioMessage?'audio.ogg':'anexo'),mime:media.mimetype||'application/octet-stream',size:Number(media.fileLength)||0,remote:true}]:[],created_at:new Date(Number(x.messageTimestamp)*1000||Date.now()).toISOString(),from_me:x.key.fromMe===true};
  });
 }
 export async function readInbox(c,createImap=imapClient){return readMailboxes(c,createImap,safeEmailHtml);}
@@ -68,6 +75,7 @@ export async function handleAttendance(operation,body,rpc,env=process.env){
   if(claimed)await rpc('attend','message_finish',{...body,status:'unknown'}).catch(()=>{});
   throw publicError('Configuração protegida indisponível. Peça ao administrador para revisar a conta.');
  }
+ if(operation==='attend_threads'){const rows=await rpc('attend','threads',{account_id:account.id});if(account.channel!=='whatsapp')return rows;return contactThreads(rows,await whatsappNames(cfg));}
  if(operation==='attend_status'){
   if(account.channel==='email')return {ready:true,state:'configured'};
   const status=await evolution(cfg,'/instance/connectionState/'+encodeURIComponent(cfg.instance));return {ready:status.instance?.state==='open',state:status.instance?.state||'unknown'};
