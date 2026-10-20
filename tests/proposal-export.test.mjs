@@ -11,6 +11,14 @@ test('proposal exports preserve charges, dates and typed values without spreadsh
  const xml=new TextDecoder().decode(xlsx);assert.match(xml,/t="inlineStr"><is><t xml:space="preserve">=1\+1/);assert.doesNotMatch(xml,/<f>/);assert.match(xml,/<v>1133<\/v>/);assert.equal(new DataView(xlsx.buffer).getUint32(0,true),0x04034b50);
  const text=new TextDecoder('latin1').decode(pdf);assert.match(text,/%PDF-1.4/);assert.match(text,/xref/);assert.match(text,/Honor/);assert.match(text,/SIMULA/);assert.match(text,/car.ncia: 30/);assert.doesNotMatch(text,/R\$ 30,00/);
 });
+test('branded reports retain individual charges, contract bases, discount and agreement status',()=>{
+ const joint={...quote,items:[{reference:'REF-UM',quote},{reference:'REF-DOIS',quote}]};
+ const rows=proposalRows(detail,joint,{...simulation,formalized:true,reference:'ACORDO-TESTE',reason:'Aceite local de teste',discount:'33',total:'1100'});
+ const pdf=new TextDecoder('latin1').decode(proposalPdf(rows)),xlsx=new TextDecoder().decode(proposalXlsx(rows));
+ for(const value of ['ESTRAT','PERFORMANCE','REF-UM','REF-DOIS','ACORDO-TESTE','1.100,00'])assert.ok(pdf.includes(value),value);
+ assert.match(xlsx,/styles.xml/);assert.match(xlsx,/pane ySplit=/);assert.match(xlsx,/autoFilter ref=/);assert.match(xlsx,/numFmtId="164"/);assert.match(xlsx,/<v>103<\/v>/);assert.match(xlsx,/<v>33<\/v>/);assert.match(xlsx,/Saldo com encargos/);
+ assert.equal(rows.find(r=>r[0]==='Juros')[1],10);assert.equal(rows.find(r=>r[0]==='Multa')[1],20);
+});
 test('collection variants identify debtor, keep proposal conditions and require verified financial context',()=>{
  for(const kind of ['cordial','statement','proposal','followup']){const message=collectionScript(kind,{...detail,quote,simulation});assert.match(message.content,/Empresa São João/);assert.match(message.subject,/Empresa São João/);}
  const message=collectionScript('proposal',{...detail,quote,simulation});assert.match(message.content,/Honorários: R\$/);assert.match(message.content,/seu aceite/);
