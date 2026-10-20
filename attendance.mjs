@@ -21,10 +21,10 @@ async function evolution(c,path,body){
  if(!r.ok)throw publicError('WhatsApp indisponível (HTTP '+r.status+').');return r.json();
 }
 export function evolutionMessages(data){
- const rows=data?.messages?.records||data?.records||[];
- return rows.filter(x=>x.key?.remoteJid?.endsWith('@s.whatsapp.net')&&x.key?.id).slice(0,100).map(x=>{
+ const rows=(data?.messages?.records||data?.records||[]).map(x=>({...x,phoneJid:[x.key?.remoteJid,x.key?.remoteJidAlt].find(j=>typeof j==='string'&&j.endsWith('@s.whatsapp.net'))}));
+ return rows.filter(x=>x.phoneJid&&x.key?.id).slice(0,100).map(x=>{
   const media=x.message?.imageMessage||x.message?.audioMessage||x.message?.documentMessage;
-  return {provider_id:x.key.id,address:x.key.remoteJid.split('@')[0],name:x.pushName||x.key.remoteJid.split('@')[0],content:String(x.message?.conversation||x.message?.extendedTextMessage?.text||media?.caption||(media?'[Anexo recebido]':'[Mensagem não textual]')).slice(0,100000),attachments:media?[{index:0,name:media.fileName||(x.message.audioMessage?'audio.ogg':'anexo'),mime:media.mimetype||'application/octet-stream',size:Number(media.fileLength)||0,remote:true}]:[],created_at:new Date(Number(x.messageTimestamp)*1000||Date.now()).toISOString(),from_me:x.key.fromMe===true};
+  return {provider_id:x.key.id,provider_ref:x.key.remoteJid,address:x.phoneJid.split('@')[0],name:x.pushName||x.phoneJid.split('@')[0],content:String(x.message?.conversation||x.message?.extendedTextMessage?.text||media?.caption||(media?'[Anexo recebido]':'[Mensagem não textual]')).slice(0,100000),attachments:media?[{index:0,name:media.fileName||(x.message.audioMessage?'audio.ogg':'anexo'),mime:media.mimetype||'application/octet-stream',size:Number(media.fileLength)||0,remote:true}]:[],created_at:new Date(Number(x.messageTimestamp)*1000||Date.now()).toISOString(),from_me:x.key.fromMe===true};
  });
 }
 export async function readInbox(c,createImap=imapClient){
@@ -101,7 +101,7 @@ export async function handleAttendance(operation,body,rpc,env=process.env){
   if(detail.thread.account_id!==account.id)throw publicError('Anexo não pertence a esta conta.');
   const message=detail.messages.find(m=>m.id===body.message_id);if(!message)throw publicError('Mensagem não encontrada.');
   if(account.channel==='whatsapp'){
-   const file=await evolution(cfg,'/chat/getBase64FromMediaMessage/'+encodeURIComponent(cfg.instance),{message:{key:{id:message.provider_id,remoteJid:detail.thread.address+'@s.whatsapp.net',fromMe:message.direction==='outbound'}},convertToMp4:false});
+   const file=await evolution(cfg,'/chat/getBase64FromMediaMessage/'+encodeURIComponent(cfg.instance),{message:{key:{id:message.provider_id,remoteJid:message.provider_ref||detail.thread.address+'@s.whatsapp.net',fromMe:message.direction==='outbound'}},convertToMp4:false});
    const base64=String(file.base64||'').replace(/^data:[^;]+;base64,/,'').replace(/\s/g,'');
    if(!base64||base64.length>6990508||!/^[A-Za-z0-9+/]+={0,2}$/.test(base64))throw publicError('Mídia indisponível ou maior que 5 MB.');
    return {base64,mime:file.mimetype||message.attachments?.[0]?.mime||'application/octet-stream',name:file.fileName||message.attachments?.[0]?.name||'anexo'};
@@ -132,4 +132,3 @@ export async function handleAttendance(operation,body,rpc,env=process.env){
  }
  await rpc('attend','message_finish',{...body,status:'accepted',provider_id});return {status:'accepted'};
 }
-
