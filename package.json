@@ -16,6 +16,10 @@
     "node": ">=22"
   },
   "dependencies": {
-    "nodemailer": "10.0.10"
+    "imapflow": "^2.5.8",
+    "mailparser": "^3.10.0",
+    "nodemailer": "10.0.10",
+    "sanitize-html": "^2.18.1"
   }
 }
+

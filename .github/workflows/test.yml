@@ -11,6 +11,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node --check web/company-bank.mjs && node --check bank.mjs && node --check web/finance.mjs && node --check web/app.mjs && node --check web/borderos.mjs && node --check web/portfolios.mjs && node --check bordero-csv.mjs && node --check api-http.mjs && node --check web/chat.mjs && node --check web/whatsapp-connection.mjs && node --check web/pricing.mjs && node --check evolution.mjs && node --check whatsapp.mjs
+      - run: node --check attendance.mjs && node --check web/attendance.mjs
       - run: npm test
       - run: npm run test:db
       - run: node tests/sectors.local.mjs
@@ -18,5 +19,8 @@ jobs:
       - run: node tests/pricing.local.mjs
       - run: node tests/bordero-csv.local.mjs
       - run: node tests/company-bank.local.mjs
+      - run: node tests/debt-batch.local.mjs
+      - run: node tests/attendance.local.mjs
       - run: node tests/scheduling.local.mjs
       - run: node --check web/app.mjs && node --check server.mjs
+
