@@ -23,3 +23,35 @@
 @media(max-width:700px){.negotiation-dialog{width:97vw}.negotiation-ledger-table th,.negotiation-ledger-table td{padding:10px}.negotiation-ledger-scroll{max-height:380px}.negotiation .negotiation-balances strong{font-size:16px}}
 .form-grid>.contract-period-help{grid-column:1/-1;font-size:12px;line-height:1.65;color:var(--muted);padding:12px;background:var(--panel,#f3f7fb);border:1px solid var(--line,#dce4ee);border-radius:6px}
 .form-grid>.creditor-fee-schedule{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px;border:1px solid var(--line,#dce4ee);border-radius:7px}.creditor-fee-schedule legend{font-weight:600}.creditor-fee-schedule p{grid-column:1/-1;font-size:12px;line-height:1.6}.negotiation .negotiation-ledger-table{min-width:1300px}@media(max-width:650px){.form-grid>.creditor-fee-schedule{grid-template-columns:1fr}}
+/* Financial workspace: consistent row rhythm and emphasis, scoped to negotiation. */
+.negotiation-dialog .negotiation>header{padding-bottom:8px;margin-bottom:12px}
+.negotiation-dialog .negotiation>header h3{font-size:18px;line-height:1.45;color:var(--text,#20364d)}
+.negotiation-dialog .negotiation>header p{font-size:12px;margin-bottom:8px}
+.negotiation-dialog .negotiation-balances{gap:10px;margin:14px 0 22px}
+.negotiation-dialog .negotiation-balances>div{border-radius:6px;padding:15px 16px;background:var(--panel,#f5f7fa);box-shadow:none}
+.negotiation-dialog .negotiation-balances strong{font-size:21px;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.negotiation-dialog .negotiation>.negotiation-balances>div:last-child{background:#eaf3fc;border-color:#bfd5ed}
+.negotiation-dialog .negotiation-ledger{margin:20px 0 26px}
+.negotiation-dialog .negotiation-section-head{padding:0 0 4px;align-items:center}
+.negotiation-dialog [data-quote-sync]{font-size:11px;color:#647b8e;line-height:1.5}
+.negotiation-dialog [data-quote-sync]::before{content:'●';color:#278968;font-size:9px;margin-right:6px}
+.negotiation-dialog .negotiation-ledger-scroll{border-color:#dce4ec;border-radius:6px;max-height:450px}
+.negotiation-dialog .negotiation-ledger-table{min-width:1150px;font-size:12px;table-layout:fixed}
+.negotiation-dialog .negotiation-ledger-table th,.negotiation-dialog .negotiation-ledger-table td{height:48px;box-sizing:border-box;padding:10px 12px;border-bottom:1px solid #e6ebf0;line-height:1.5}
+.negotiation-dialog .negotiation-ledger-table th{font-size:11px;letter-spacing:.1px;color:#496177;background:#f0f4f8}
+.negotiation-dialog .negotiation-ledger-table :is(th,td):first-child{width:21%;min-width:0;max-width:none;white-space:normal;overflow-wrap:anywhere;text-align:left}
+.negotiation-dialog .negotiation-ledger-table tbody tr:nth-child(odd) td{background:#fff}
+.negotiation-dialog .negotiation-ledger-table tbody tr:nth-child(even) td{background:#f8fafc}
+.negotiation-dialog .negotiation-ledger-table tbody tr:hover td{background:#eef5fc}
+.negotiation-dialog .negotiation-ledger-table thead th:not(:first-child):not(:nth-child(4)):not(:nth-child(5)){text-align:right}
+.negotiation-dialog .negotiation-ledger-table :is(th,td):nth-child(4),.negotiation-dialog .negotiation-ledger-table :is(th,td):nth-child(5){text-align:center;width:9%;white-space:nowrap}
+.negotiation-dialog .negotiation-ledger-table tbody td:last-child{color:#154d80;font-weight:600}
+.negotiation-dialog .negotiation-ledger-table tfoot :is(th,td){position:sticky;bottom:0;background:#eaf0f6;border-top:1px solid #cbd8e5;z-index:1;font-size:12px;font-weight:600;color:#203e5b}
+.negotiation-dialog .negotiation-ledger-table tfoot th{width:21%}
+.negotiation-dialog .negotiation-period-note{font-size:11px;margin-top:9px;line-height:1.6}
+.negotiation-dialog .negotiation-explanation{display:none}
+html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table tbody tr:nth-child(odd) td{background:#203247}
+html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table tbody tr:nth-child(even) td{background:#263a50}
+html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table :is(th,tfoot td){background:#30465d;color:#dce7f2}
+html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table tbody td:last-child{color:#b9d9f8}
+@media(max-width:700px){.negotiation-dialog .negotiation-balances strong{font-size:17px}.negotiation-dialog .negotiation-balances>div{padding:12px}.negotiation-dialog .negotiation-section-head{align-items:flex-start;flex-direction:column}.negotiation-dialog .negotiation-ledger-table :is(th,td){height:46px}}
