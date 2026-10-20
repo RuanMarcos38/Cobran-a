@@ -4,6 +4,7 @@ import {renderAttendance} from './attendance.mjs';
 import {renderCompanyBank} from './company-bank.mjs';
 import {companyForm,companyAutocomplete,consumeCompanyDraft} from './company.mjs';
 import {installPasswordControls} from './passwords.mjs';
+import {installWindowControls} from './window-controls.mjs';
 import {configureEmail,openEmail,emailHistory} from './email.mjs';
 import {renderPricing,pricingSections} from './pricing.mjs';
 import {renderPortfolios} from './portfolios.mjs';
@@ -147,5 +148,6 @@ window.addEventListener('hashchange',()=>{if(!api.authenticated()||!state.profil
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('menu-open')){document.body.classList.remove('menu-open');const b=document.querySelector('[data-action=menu]');b?.setAttribute('aria-expanded','false');b?.focus();}});
 
 installPasswordControls();
+installWindowControls();
 await api.init();if(api.authenticated()){try{await start();}catch(e){loginView();notify(e.message);}}else loginView();
 
