@@ -13,9 +13,10 @@ export function simulateNegotiation(quote,proposal,limit=0){
  const schedule=[...(entry>0n?[{number:0,label:'Entrada',due_date:proposal.first_due_date,amount:decimal(entry)}]:[]),...parts.map((amount,i)=>({number:i+1,label:count===1&&entry===0n?'À vista':'Parcela '+(i+1),due_date:monthlyDueDate(proposal.first_due_date,i),amount}))];
  return {base:decimal(base),discount:decimal(base-total),total:decimal(total),entry:decimal(entry),remaining:decimal(total-entry),schedule};
 }
+export async function loadNegotiation(api,id){const detail=await api.rpc('detail',{id});detail.debtor=detail.debtor||await api.rpc('get',{entity:'debtors',id:detail.process.debtor_id});const quote=await api.rpc('quote',{id});return {detail,quote};}
 export async function openNegotiation({api,modal,notify,guard,profile,refresh},id){
  if(!['admin','master','supervisor','collector','finance'].includes(profile.role))throw Error('Seu perfil não permite negociar títulos.');
- let detail=await api.rpc('detail',{id}),quote=await api.rpc('quote',{id});const process=detail.process,limit=profile.discount_limit||0;
+ let {detail,quote}=await loadNegotiation(api,id);const process=detail.process,limit=profile.discount_limit||0;
  const blocked=()=>quote.configured===false?'Configure a regra do contrato antes de formalizar.':detail.agreements.some(a=>a.status==='active')?'Este título já tem acordo ativo. Consulte suas parcelas no processo.':['paid','uncollectible','cancelled','canceled'].includes(process.status)?'Título encerrado: formalização indisponível.':'';
  const input=(name,label,value,type='number',extra='')=>`<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" ${extra} required></label>`;
  let lastSimulation,proposalText='';

@@ -1,4 +1,4 @@
-import {simulateNegotiation} from '../web/negotiation.mjs';
+import {simulateNegotiation,loadNegotiation} from '../web/negotiation.mjs';
 import {readFile,readdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {PGlite} from '@electric-sql/pglite';
@@ -22,6 +22,6 @@ const as=async id=>db.exec("reset role;set test.uid='"+id+"';set role authentica
 const rpc=async(action,payload={})=>(await db.query('select public.cobranca_app($1,$2) result',[action,JSON.stringify(payload)])).rows[0].result;
 await as(admin);const c=(await rpc('save',{entity:'creditors',name:'Credor de negociação',fee_percent:'0'})).id;const b=(await rpc('save',{entity:'debtors',name:'Devedor de negociação',document:'12345678000190',creditor_id:c})).id;
 const created=await rpc('new_process',{creditor_id:c,debtor_id:b,assigned_to:collector,external_ref:'NEG-LOCAL',original_amount:'100.05',due_date:'2026-01-01',interest_percent:'0',fine_percent:'0'});const quote=await rpc('quote',{id:created.id});const data={discount_percent:'10',down_payment:'7.03',installments:'3',first_due_date:'2027-01-31',reason:'Aceite em ambiente local de teste'};
-const s=simulateNegotiation(quote,data,100);const before=await rpc('detail',{id:created.id});assert.equal(before.agreements.length,0);assert.equal(before.installments.length,0);
+const context=await loadNegotiation({rpc},created.id);assert.equal(context.detail.debtor.name,'Devedor de negociação');assert.equal(context.detail.creditor.name,'Credor de negociação');await as(collector);assert.equal((await loadNegotiation({rpc},created.id)).detail.debtor.name,'Devedor de negociação');await as(admin);const s=simulateNegotiation(quote,data,100);const before=await rpc('detail',{id:created.id});assert.equal(before.agreements.length,0);assert.equal(before.installments.length,0);
 await as(other);await assert.rejects(()=>rpc('quote',{id:created.id}));await as(admin);await rpc('agreement',{id:created.id,...data});const after=await rpc('detail',{id:created.id});assert.equal(Number(after.agreements[0].total_amount),Number(s.total));assert.equal(after.installments.length,s.schedule.length);const actual=after.installments.slice().sort((a,b)=>a.installment_number-b.installment_number);for(let i=0;i<s.schedule.length;i++){assert.equal(Number(actual[i].amount),Number(s.schedule[i].amount));assert.equal(String(actual[i].due_date).slice(0,10),s.schedule[i].due_date);}await assert.rejects(()=>rpc('agreement',{id:created.id,...data}));assert.equal((await rpc('detail',{id:created.id})).agreements.length,1);
 console.log('PASS negociação: simulação sem gravação; centavos, entrada e calendário equivalentes ao banco; acordo registrado apenas no teste local; bloqueio de duplicação e isolamento de empresa');await db.close();
