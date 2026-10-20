@@ -1,10 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {proposalRows,proposalPdf,proposalXlsx} from '../web/proposal-export.mjs';
+import {proposalRows,proposalPdf,proposalXlsx,canExportProposal,authorizeProposalExport,downloadProposal} from '../web/proposal-export.mjs';
 import {collectionScript} from '../web/collection-scripts.mjs';
 const quote={as_of:'2026-03-02',due_date:'2026-01-01',principal:1000,interest:10,fine:20,fees:103,total:1133,days:30,terms:{interest_percent:1,mode:'monthly',fine_percent:2,fee_percent:10,fee_basis:'updated'}};
 const detail={debtor:{name:'Empresa São João'},creditor:{name:'Credor'},process:{external_ref:'=1+1',due_date:'2026-01-01'}};
 const simulation={discount:'0',total:'1133',entry:'0',schedule:[{label:'À vista',due_date:'2026-03-02',amount:'1133'}]};
+test('financial reports require a fresh administrator profile and deny other roles before download',async()=>{
+ for(const role of ['collector','supervisor','finance','commercial','client',undefined]){
+  assert.equal(canExportProposal({role}),false);
+  await assert.rejects(authorizeProposalExport({rpc:async action=>{assert.equal(action,'profile');return {role};}}),/administradores/);
+  assert.throws(()=>downloadProposal(detail,quote,simulation,'pdf',{role}),/administradores/);
+ }
+ for(const role of ['admin','master'])assert.deepEqual(await authorizeProposalExport({rpc:async()=>({role})}),{role});
+});
 test('proposal exports preserve charges, dates and typed values without spreadsheet formulas',()=>{
  const rows=proposalRows(detail,quote,simulation),xlsx=proposalXlsx(rows),pdf=proposalPdf(rows);
  assert.equal(rows.find(r=>r[0]==='Honorários')[1],103);

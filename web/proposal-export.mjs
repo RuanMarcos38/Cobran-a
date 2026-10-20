@@ -106,7 +106,14 @@ export function proposalPdf(rows){
  let pdf='%PDF-1.4\n',offsets=[0];for(let i=1;i<objects.length;i++){offsets.push(pdf.length);pdf+=`${i} 0 obj\n${objects[i]}\nendobj\n`;}const start=pdf.length;pdf+=`xref\n0 ${objects.length}\n0000000000 65535 f \n`+offsets.slice(1).map(n=>String(n).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`;return Uint8Array.from(pdf,c=>c.charCodeAt(0));
 }
 
-export function downloadProposal(detail,quote,s,format){
+export const canExportProposal=profile=>['admin','master'].includes(profile?.role);
+export async function authorizeProposalExport(api){
+ const profile=await api.rpc('profile');
+ if(!canExportProposal(profile))throw Error('Somente administradores podem exportar este relatório.');
+ return profile;
+}
+export function downloadProposal(detail,quote,s,format,profile){
+ if(!canExportProposal(profile))throw Error('Somente administradores podem exportar este relatório.');
  const rows=proposalRows(detail,quote,s),bytes=format==='pdf'?proposalPdf(rows):proposalXlsx(rows),url=URL.createObjectURL(new Blob([bytes],{type:format==='pdf'?'application/pdf':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
  const a=document.createElement('a');a.href=url;a.download='negociacao-'+quote.as_of+'.'+format;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
