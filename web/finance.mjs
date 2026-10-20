@@ -1,6 +1,7 @@
+import {renderCompanyBank} from './company-bank.mjs';
 import {renderSector} from './crm.mjs';
 import {brl,parseCsv} from './money.mjs';
-export const financeSections=['Contas a pagar','Contas a receber','Faturamento','Crédito','Conciliação bancária','Histórico dos clientes','Integrações ERP'];
+export const financeSections=['Contas a pagar','Contas a receber','Faturamento','Crédito','Conciliação bancária','Histórico dos clientes','Integrações ERP','Integração bancária / Boletos'];
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const field=(n,l,v='',type='text')=>`<label>${esc(l)}<input name="${n}" type="${type}" value="${esc(v)}" required ${type==='number'?'min="0" step="0.01"':''}></label>`;
 const choice=(n,l,opts,value='')=>`<label>${esc(l)}<select name="${n}">${opts.map(o=>`<option value="${esc(o.id)}" ${String(value)===String(o.id)?'selected':''}>${esc(o.name)}</option>`).join('')}</select></label>`;
@@ -9,6 +10,7 @@ const btn=(id,l)=>`<button data-fin="${esc(id)}">${esc(l)}</button>`;
 const today=()=>new Date().toLocaleDateString('en-CA');
 export async function renderFinance(section,ctx,target){
  const {api,modal,guard,notify}=ctx,again=()=>renderFinance(section,ctx,target),on=(id,fn)=>target.querySelector(`[data-fin="${id}"]`)?.addEventListener('click',()=>guard(fn));
+ if(section==='Integração bancária / Boletos')return renderCompanyBank(section,ctx,target);
  if(section==='Integrações ERP')return renderSector('Integrações / API',ctx,target);
  const ledger=await api.rpc('fin_list',{}),creditors=[{id:'',name:'Sem vínculo'},...ledger.creditors];
  if(['Contas a pagar','Contas a receber','Faturamento'].includes(section)){

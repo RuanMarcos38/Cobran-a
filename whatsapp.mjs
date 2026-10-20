@@ -24,6 +24,6 @@ export async function handleChannel(operation,body,rpc,env=process.env,fetcher=f
   return {ready:false,state:'qr',base64:raw.slice(raw.indexOf(',')+1)};
  }
  const override=c?{...env,WHATSAPP_CONNECTIONS_JSON:JSON.stringify({[profile.tenant_id]:c})}:env;
- const result=await handleWhatsapp(operation,body,(action,payload)=>rpc('app',action,payload),override);
+ const result=await handleWhatsapp(operation,body,(action,payload)=>rpc('app',action,payload),override,fetcher);
  return operation==='whatsapp_status'?{...result,can_configure:admin,origin:env.EVOLUTION_ALLOWED_ORIGIN||c?.url||'',configured:!!c}:result;
 }

@@ -6,9 +6,8 @@ const db=new PGlite();
 await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;`);
 const files=await readdir(new URL('../database/',import.meta.url));
 for(const name of ['supabase-schema.sql',...files.filter(n=>/^\d.*\.sql$/.test(n)).sort()]){
- try{await db.exec((await readFile(new URL('../database/'+name,import.meta.url),'utf8')).replace('create extension if not exists "pgcrypto";',''));}catch(e){console.error('MIGRATION',name);throw e;}
+ try{if(name==='019-booking-links.sql')await db.exec(await readFile(new URL('../supabase/migrations/20261019005921_n8n_commercial_schedule.sql',import.meta.url),'utf8'));await db.exec((await readFile(new URL('../database/'+name,import.meta.url),'utf8')).replace('create extension if not exists "pgcrypto";',''));}catch(e){console.error('MIGRATION',name);throw e;}
 }
-await db.exec(await readFile(new URL('../supabase/migrations/20261019005921_n8n_commercial_schedule.sql',import.meta.url),'utf8'));
 const tenant='00000000-0000-0000-0000-000000000000',otherTenant='88888888-8888-4888-8888-888888888888';
 const admin='11111111-1111-4111-8111-111111111111',finance='22222222-2222-4222-8222-222222222222',manager='33333333-3333-4333-8333-333333333333',operator='44444444-4444-4444-8444-444444444444',other='55555555-5555-4555-8555-555555555555';
 await db.exec(`insert into public.cobranca_tenants(id,name) values('${otherTenant}','Other');`);
@@ -120,6 +119,30 @@ assert.equal((await rpc('pricing_snapshot',{contract_id:version1.id,period:'2026
 assert.equal((await rpc('pricing_snapshot',{contract_id:version2.id,period:'2026-02-01'})).minimum,590);
 assert.equal((await rpc('pricing_close',{contract_id:version1.id,period:'2026-02-01',operation:'draft'})).billing,0);
 assert.equal((await rpc('pricing_close',{contract_id:version2.id,period:'2026-02-01',operation:'draft'})).billing,590);
+
+await as(admin);
+const terms={overdue_cutoffs:[7,21,45,120],volume_cutoffs:[2,5,8,11],volume_discounts:[0,2,4,6,9],minimum_fee_rate:1};
+const editable=await rpc('pricing_contract',{creditor_id:creditor,contract_ref:'CUSTOM-RATES',model:'B',starts_on:'2026-01-01',ends_on:'2027-12-31',rates:[4,8,12,16,22],minimums:[100,200,300,400,500],volume_discount:true,terms});
+assert.deepEqual(editable.terms.overdue_cutoffs,[7,21,45,120]);
+const configured=await rpc('pricing_simulate',{creditor_id:creditor,contract_id:editable.id,model:'B',debtors:6,titles:6,recovery_percent:100,bands:[1000,0,0,0,0],cost:0});
+assert.equal(configured.discount,4);assert.equal(configured.minimum,300);assert.equal(configured.rows[0].rate,1);assert.equal(configured.fees,10);
+const configuredCorporate=await rpc('pricing_simulate',{creditor_id:creditor,contract_id:editable.id,model:'B',debtors:12,titles:12,recovery_percent:100,bands:[1000,0,0,0,0],cost:0});
+assert.equal(configuredCorporate.discount,9);assert.equal(configuredCorporate.minimum,500);
+for(const [days,band]of [[0,0],[7,1],[8,2],[21,2],[22,3],[45,3],[46,4],[120,4],[121,5]]){
+ const x=await raw('select cobranca_private.fee_band_config($1,$2::jsonb) band',[days,JSON.stringify(terms.overdue_cutoffs)]);assert.equal(x.rows[0].band,band);
+}
+for(const [count,band]of [[1,1],[2,2],[4,2],[5,3],[7,3],[8,4],[10,4],[11,5]]){
+ const x=await raw('select cobranca_private.fee_volume_band_config($1,$2::jsonb) band',[count,JSON.stringify(terms.volume_cutoffs)]);assert.equal(x.rows[0].band,band);
+}
+await as(admin);
+for(const invalidTerms of [{...terms,overdue_cutoffs:[7,5,45,120]},{...terms,overdue_cutoffs:[7,null,45,120]},{...terms,volume_cutoffs:[2,5,null,11]},{...terms,volume_discounts:[0,2,4,-1,9]},{...terms,volume_discounts:[0,2,null,6,9]},{...terms,minimum_fee_rate:101}]){
+ await assert.rejects(()=>rpc('pricing_contract',{creditor_id:creditor,contract_ref:'INVALID-CUSTOM',model:'B',starts_on:'2026-01-01',ends_on:'2027-12-31',rates:[4,8,12,16,22],terms:invalidTerms}));
+}
+const largerDiscount=await rpc('pricing_contract',{creditor_id:creditor,contract_ref:'CUSTOM-CORPORATE',model:'B',starts_on:'2026-01-01',ends_on:'2027-12-31',rates:[4,8,12,16,22],minimums:[100,200,300,400,500],volume_discount:true,terms:{...terms,volume_discounts:[0,2,4,6,35]}});
+assert.equal(Number(largerDiscount.corporate_discount),35);
+const largeConfigured=await rpc('pricing_simulate',{creditor_id:creditor,contract_id:largerDiscount.id,model:'B',debtors:12,titles:12,recovery_percent:100,bands:[1000,0,0,0,0],cost:0});
+assert.equal(largeConfigured.discount,35);assert.equal(largeConfigured.rows[0].rate,1);
+assert.deepEqual((await rpc('pricing_list')).contracts.find(c=>c.id===contract.id).rates,[10,15,20,25,30]);
 console.log('PASS pricing: exact commercial examples; age and volume boundaries; CPF/CNPJ; installments; partial/pre-due payments; immutable legacy; approval/replay; compensated reversal; permissions and tenant isolation. No billing or transfers.');
 if(process.env.PRICING_UI==='1'){await as(admin);await (await import('./pricing-ui.mjs')).runPricingUi({db,admin,creditor,contract:contractB});}
 await db.close();
