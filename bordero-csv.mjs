@@ -99,6 +99,15 @@ export function parseBorderoCsv(bytes,name){
   }
   if(start<0)throw Error('Cabeçalho do borderô não reconhecido. Confira Nome Cliente, Identificação do Título, Data Vencto e Valor Aberto');
   const rows=[],errors=[],warnings=[];
+  const mapped=new Map();
+  mapping.forEach((header,index)=>{
+    const field=fields.get(canonical(header));
+    if(!field)warnings.push('Coluna não reconhecida '+(index+1)+': '+header+'. Valor preservado nos campos originais.');
+    else {
+      if(mapped.has(field)&&field!=='debtor_email')errors.push({source:'CSV:'+String(start+1),error:'Colunas duplicadas para '+field+': '+mapped.get(field)+' e '+header+'. Revise o mapeamento antes de importar.'});
+      mapped.set(field,header);
+    }
+  });
   if(encoding!=='UTF-8')warnings.push('Codificação '+encoding+' reconhecida automaticamente.');
   if(mapping.filter(h=>canonical(h)==='emaildevedor').length>1)warnings.push('Colunas de e-mail repetidas preservadas; usado o primeiro e-mail preenchido.');
   for(let i=start+1;i<matrix.length;i++){

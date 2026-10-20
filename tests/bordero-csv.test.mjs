@@ -44,6 +44,14 @@ test('rejeita arquivos não CSV, cabeçalho não reconhecido, aspas quebradas e 
  assert.throws(()=>parseBorderoCsv(Buffer.from('"valor não fechado'),'a.csv'),/Aspas/);
 });
 
+test('colunas desconhecidas são preservadas e duplicidades de campos bloqueiam a importação',()=>{
+ const extra=parseBorderoCsv(file([[...header,'Campo extra'],[...row(),'Valor original']]),'modelo.csv');
+ assert.match(extra.warnings.join(' '),/Coluna não reconhecida/);
+ assert.equal(extra.rows[0].raw['Campo extra'],'Valor original');
+ const duplicate=parseBorderoCsv(file([[...header,'Vencimento'],[...row(),'28/01/2026']]),'modelo.csv');
+ assert.ok(duplicate.errors.some(e=>/Colunas duplicadas para due_date/.test(e.error)));
+});
+
 
 test('regressão de layout ELISATEX: 14 lançamentos, 24 colunas, CP1252, identificador composto repetido 3 vezes',()=>{
  const refs=['DOC-A','LOTE-B,C','DOC-C','LOTE-B,C','DOC-D','DOC-E','DOC-F','RENEGOCIAÇÃO','LOTE-B,C','DOC-G','DOC-H','DOC-I','DOC-J','DOC-K'];

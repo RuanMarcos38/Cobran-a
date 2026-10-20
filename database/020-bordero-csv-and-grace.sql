@@ -31,10 +31,10 @@ begin
  source_hash:=payload->>'file_hash';if source_hash is null or source_hash !~ '^[a-f0-9]{64}$' or length(coalesce(payload->>'file_name','')) not between 1 and 200 then raise exception 'Identificação de arquivo inválida';end if;
  select id into assigned from public.cobranca_profiles where tenant_id=p.tenant_id and active and role='collector' order by id limit 1;
  if assigned is null then assigned:=p.id;end if; -- Sem negociador, manter os processos com o gestor autenticado, sem disparos
- terms:=jsonb_build_object('mode',coalesce(c.metadata->>'financial_mode','none'),'interest_percent',coalesce((c.metadata->>'default_interest')::numeric,0),'fine_percent',coalesce((c.metadata->>'default_fine')::numeric,0),'grace_days',coalesce((c.metadata->>'grace_days')::int,0));
+ terms:=jsonb_build_object('financial_mode',coalesce(c.metadata->>'financial_mode','none'),'interest_percent',coalesce((c.metadata->>'default_interest')::numeric,0),'fine_percent',coalesce((c.metadata->>'default_fine')::numeric,0),'grace_days',coalesce((c.metadata->>'grace_days')::int,0));
  if nullif(trim(coalesce(payload->>'contract_ref','')),'') is null then
   -- Não cobrar encargos sem referência ao documento que os autoriza.
-  terms:=terms||jsonb_build_object('mode','none','interest_percent',0,'fine_percent',0);
+  terms:=terms||jsonb_build_object('financial_mode','none','interest_percent',0,'fine_percent',0);
  end if;
  for item in select value from jsonb_array_elements(payload->'rows') loop
   if coalesce((item->>'repeated_title')::boolean,false) and not coalesce((payload->>'acknowledge_repeated_titles')::boolean,false) then raise exception 'Títulos com identificação repetida exigem confirmação expressa';end if;
@@ -81,6 +81,8 @@ grant execute on function cobranca_private.file_bordero(text,jsonb) to authentic
 create or replace function public.cobranca_app(action text,payload jsonb default '{}')
 returns jsonb language sql security invoker set search_path='' as $$
  select case
+  when action='schedule_config' then cobranca_private.schedule_config(payload)
+  when action='crm_tasks' then cobranca_private.schedule_tasks(payload)
   when action in ('bordero_context','bordero_import') then cobranca_private.file_bordero(action,payload)
   when action like 'pricing_%' then cobranca_private.pricing(action,payload)
   when action='detail' then cobranca_private.fee_detail(payload)

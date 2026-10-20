@@ -45,5 +45,14 @@ if(false&&process.env.BORDERO_XLS){
  assert.equal(Object.keys(imported.original_fields).length,23);assert.equal(imported.original_fields.representative,'Representante');
  console.log('PASS supplied XLS: empty template recognized; synthetic record preserves all 23 columns, contacts, address, installment and protest amount without adding it to the balance.');
 }
-console.log('PASS CSV file borderos: all migrations, creditor/tenant/role validation, code-only debtor identity, exact amounts, atomic rollback, unchanged contacts/restrictions, replay/conflict detection and assignment.');
+// Contractual interest must pass the same field used by new_process.
+await as(admin);
+const contracted=await rpc('bordero_import',{...payload,contract_ref:'CONTRACT-TEST',rows:[{...row,external_ref:'WITH-CONTRACT'}]});
+await db.exec('reset role');
+const contractedDebt=(await db.query('select interest_percent,fine_percent,metadata from public.cobranca_debts where id=$1',[contracted.items[0].id])).rows[0];
+assert.equal(Number(contractedDebt.interest_percent),12);
+assert.equal(Number(contractedDebt.fine_percent),2);
+assert.equal(contractedDebt.metadata.financial_terms.mode,'monthly');
+assert.equal(contractedDebt.metadata.financial_terms.grace_days,730);
+console.log('PASS CSV file borderos: all migrations, creditor/tenant/role validation, code-only debtor identity, exact amounts, atomic rollback, unchanged contacts/restrictions, replay/conflict detection and assignment; contractual interest and grace preserved.');
 await db.close();

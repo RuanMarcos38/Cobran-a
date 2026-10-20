@@ -184,6 +184,8 @@ grant execute on function cobranca_private.company_bank(text,jsonb) to authentic
 create or replace function public.cobranca_app(action text,payload jsonb default '{}')
 returns jsonb language sql security invoker set search_path='' as $$
  select case
+  when action='schedule_config' then cobranca_private.schedule_config(payload)
+  when action='crm_tasks' then cobranca_private.schedule_tasks(payload)
   when action like 'company_%' or action like 'bank_%' then cobranca_private.company_bank(action,payload)
   when action in ('bordero_context','bordero_import') then cobranca_private.file_bordero(action,payload)
   when action like 'pricing_%' then cobranca_private.pricing(action,payload)
