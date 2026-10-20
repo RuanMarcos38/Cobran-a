@@ -163,3 +163,5 @@ html[data-theme=dark] .chat-contacts button.chat-active{background:#2a3942;box-s
 .company-details dd{margin:0;font-size:14px;overflow-wrap:anywhere}
 html[data-theme=dark] .company-details div{background:#1c2838;border-color:#39485c}
 html[data-theme=dark] .company-details dt{color:#afc3d6}
+.form-grid>.bulk-delete-preview{grid-column:1/-1;min-width:0}.bulk-delete-preview>p{margin:12px 0}.bulk-delete-preview>.table-wrap{max-height:300px;overflow:auto;margin:14px 0}.bulk-delete-preview>label{display:block;margin:12px 0}.bulk-delete-preview>label input{width:100%}
+

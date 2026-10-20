@@ -1,3 +1,4 @@
+import {handleAttendance} from './attendance.mjs';
 import {handleBank} from './bank.mjs';
 import {parseBorderoCsv} from './bordero-csv.mjs';
 import {handleChannel} from './whatsapp.mjs';
@@ -34,6 +35,10 @@ export async function handleApi(req,res,env=process.env){
   const rpc=async(name,args)=>{const upstream=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json',...(operation==='booking_link'?{Authorization:authorization}:{})},body:JSON.stringify(args),signal:AbortSignal.timeout(20000)});const data=await upstream.json();if(!upstream.ok){const error=Error(data.message||'Solicitação rejeitada');error.status=data.code==='40001'?409:data.code==='28000'?401:400;throw error;}return data;};
   try{const data=operation==='public_booking'?await rpc('cobranca_booking_public',{token:body.token,payload:{operation:body.operation,start:body.start,contact_name:body.contact_name}}):await issueBooking(body,rpc,env,operation==='prospect_booking'?req.headers['x-integration-key']:null);send(200,{data});}catch(error){send(error.status||400,{error:error.message});}return true;
  }
+ if(operation.startsWith('attend_')){
+ const rpc=async(kind,action,payload)=>{const name=kind==='attend'?'cobranca_attendance':kind==='email'?'cobranca_email':kind==='improve'?'cobranca_improvements':'cobranca_app';const r=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:authorization,'Content-Type':'application/json'},body:JSON.stringify({action,payload}),signal:AbortSignal.timeout(20000)});const data=await r.json();if(!r.ok)throw Error(data.message||'Atendimento não autorizado');return data;};
+ try{send(200,{data:await handleAttendance(operation,body,rpc,env)});}catch(error){send(400,{error:error.public?error.message:'Não foi possível concluir. Confira a conexão e as permissões da conta de atendimento.'});}return true;
+ }
  if(['email_status','email_configure','email_preview','email_send','email_history'].includes(operation)){
   const rpc=async(kind,action,payload)=>{const r=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/'+(kind==='email'?'cobranca_email':'cobranca_app'),{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:authorization,'Content-Type':'application/json'},body:JSON.stringify({action,payload}),signal:AbortSignal.timeout(20000)});const d=await r.json();if(!r.ok)throw Error(d.message||'Acesso não autorizado');return d;};
   try{send(200,{data:await handleEmail(operation,body,rpc,env)});}catch(e){send(400,{error:e.message});}return true;
@@ -49,3 +54,4 @@ export async function handleApi(req,res,env=process.env){
  }
  try{const upstream=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/'+(operation==='commercial_schedule'?'cobranca_schedule':operation==='erp_sync'?'cobranca_erp_sync':bordero?'cobranca_bordero':'cobranca_app'),{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json',...(bordero?{}:{Authorization:authorization})},body:JSON.stringify(bordero?{token:req.headers['x-integration-key'],payload:body}:{action:operation,payload:body}),signal:AbortSignal.timeout(20000)});const data=await upstream.json();send(upstream.ok?200:operation==='commercial_schedule'&&data.code==='28000'?401:operation==='commercial_schedule'&&data.code==='40001'?409:upstream.status,{...(upstream.ok?{data}:{error:data.message||'Solicitação rejeitada'})});}catch{send(502,{error:'Não foi possível acessar o backend'});}return true;
 }
+
