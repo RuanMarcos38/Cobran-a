@@ -5,7 +5,7 @@ export function collectionScript(kind,{debtor,creditor,quote,simulation,sender='
  if(['statement','proposal'].includes(kind)&&!quote)throw Error('Abra a negociação para incluir valores conferidos.');
  if(kind==='proposal'&&!simulation)throw Error('Corrija a simulação antes de gerar a proposta.');
  const summary=quote?`\n\nDemonstrativo atualizado em ${quote.as_of.split('-').reverse().join('/')}:\nPrincipal: ${brl(quote.principal)}\nJuros: ${brl(quote.interest)}\nMulta: ${brl(quote.fine)}\nHonorários: ${brl(quote.fees||0)}\nSaldo: ${brl(quote.total)}`:'';
- const reference=creditor?.name?` referente a ${creditor.name}`:'';
+ const reference=creditor?.name?.trim()?` referentes a ${creditor.name.trim()}`:'';
  const texts={cordial:`Olá, ${name}.\n\nEntramos em contato para conversar sobre a regularização dos títulos${reference}. Podemos verificar as condições de pagamento mais adequadas para você?`,statement:`Olá, ${name}.\n\nSegue o demonstrativo dos títulos${reference}, atualizado conforme as condições cadastradas do contrato.${summary}\n\nSe identificar alguma divergência ou pagamento já realizado, responda este e-mail para conferirmos.`,proposal:`Olá, ${name}.\n\nPreparamos uma proposta para os títulos${reference}.${summary}`+(simulation?`\n\nDesconto proposto: ${brl(simulation.discount)}\nTotal da proposta: ${brl(simulation.total)}\n`+simulation.schedule.map(p=>`${p.label}: ${brl(p.amount)} em ${p.due_date.split('-').reverse().join('/')}`).join('\n'):'')+`\n\nA proposta depende da conferência do saldo e do seu aceite. Responda este e-mail para avaliar as condições.`,followup:`Olá, ${name}.\n\nGostaríamos de retomar a conversa sobre os títulos${reference}. Estamos à disposição para esclarecer os valores e avaliar uma possibilidade de negociação. Se já regularizou, envie a informação para conferência.`};
  if(!texts[kind])throw Error('Escolha um modelo de cobrança válido.');
  return {subject:`${kind==='proposal'?'Proposta de negociação':'Atendimento de cobrança'} — ${name}`,content:texts[kind]+`\n\nAtenciosamente,\n${sender}`};
@@ -24,9 +24,8 @@ export function collectionComposer(container,{api,guard,notify,context,beforeSen
   const signature=JSON.stringify([account.id,address,subject,content]);
   if(pending)throw Error('Este envio já foi solicitado. Confira o histórico de e-mail antes de tentar novamente.');
   if(generatedContext&&generatedContext!==contextKey())throw Error('A proposta foi alterada. Gere o texto novamente e confira os valores antes de enviar.');
-  await beforeSend();
   sending=true;el('[data-collection-send]').disabled=true;
-  try{const t=await api.attendance('thread_open',{account_id:account.id,address,name:context().debtor.name});pending={nonce:crypto.randomUUID(),signature};const prepared=await api.attendance('message_prepare',{thread_id:t.id,nonce:pending.nonce,subject,content,note:false});await api.server('attend_send',{account_id:account.id,thread_id:t.id,message_id:prepared.id});status.textContent='E-mail aceito pelo provedor. Consulte o envio e as respostas no E-mail de atendimento.';notify('E-mail aceito pelo provedor.');}
+  try{await beforeSend();const t=await api.attendance('thread_open',{account_id:account.id,address,name:context().debtor.name});pending={nonce:crypto.randomUUID(),signature};const prepared=await api.attendance('message_prepare',{thread_id:t.id,nonce:pending.nonce,subject,content,note:false});await api.server('attend_send',{account_id:account.id,thread_id:t.id,message_id:prepared.id});status.textContent='E-mail aceito pelo provedor. Consulte o envio e as respostas no E-mail de atendimento.';notify('E-mail aceito pelo provedor.');}
   catch(e){status.textContent=pending?'Envio sem confirmação nesta tela. Confira o histórico antes de reenviar.':e.message;throw e;}
   finally{sending=false;el('[data-collection-send]').disabled=!!pending;}
  });
