@@ -42,5 +42,11 @@ await as(admin);const id2=await create('CONTRATO-2');const batch=await joint('qu
 await db.exec('reset role');await db.query("update public.cobranca_creditors set metadata=jsonb_set(metadata,'{default_interest}','\"2\"') where id=$1",[c]);
 await as(admin);await assert.rejects(()=>joint('formalize',{ids:[id,id2],expected_snapshot:batch.snapshot,discount_percent:'0',down_payment:'0',installments:'2',first_due_date:'2030-01-01',reason:'Teste de atualização do contrato'}));
 assert.equal((await rpc('detail',{id})).agreements.length,0);
+await db.exec("reset role;set TimeZone to 'Pacific/Kiritimati'");await as(admin);
+const localToday=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const localQuote=await joint('quote',{ids:[id,id2]});assert.equal(localQuote.as_of,localToday);assert.equal(localQuote.items[0].quote.as_of,localToday);
+await joint('formalize',{ids:[id,id2],expected_snapshot:localQuote.snapshot,discount_percent:'0',down_payment:'0',installments:'2',first_due_date:localToday,reason:'Aceite fictício em banco local para validar a data brasileira'});
+assert.equal((await db.query("select current_setting('TimeZone') tz")).rows[0].tz,'Pacific/Kiritimati');
+console.log('PASS data brasileira preservada no cálculo e aceite, independentemente do fuso da conexão; fuso externo restaurado');
 console.log('PASS contrato: taxas do credor sobrepõem importação sem encargos; vencimento, carência, honorários sobre saldo, pagamentos, estorno, congelamento, soma e bloqueio de saldo alterado');
 await db.close();
