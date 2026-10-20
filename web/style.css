@@ -154,3 +154,12 @@ html[data-theme=dark] .chat-contacts button.chat-active{background:#2a3942;box-s
  .chat-toolbar .chat-search-label{min-width:100%;max-width:none;order:3}
  .chat-toolbar .chat-connection-ready{font-size:11px}
 }
+
+
+/* Empresa usuária: dados da titular e contas bancárias sem alterar os estilos legados. */
+.company-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:16px 0}
+.company-details div{min-width:0;padding:13px 14px;border:1px solid var(--line,#d8e0e8);border-radius:6px;background:var(--pale,#f7f9fc)}
+.company-details dt{font-size:12px;font-weight:600;color:var(--muted,#657486);margin:0 0 5px}
+.company-details dd{margin:0;font-size:14px;overflow-wrap:anywhere}
+html[data-theme=dark] .company-details div{background:#1c2838;border-color:#39485c}
+html[data-theme=dark] .company-details dt{color:#afc3d6}

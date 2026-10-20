@@ -43,3 +43,38 @@ test('rejeita arquivos não CSV, cabeçalho não reconhecido, aspas quebradas e 
  assert.throws(()=>parseBorderoCsv(Buffer.from('name;document\nx;y'),'a.csv'),/Cabeçalho/);
  assert.throws(()=>parseBorderoCsv(Buffer.from('"valor não fechado'),'a.csv'),/Aspas/);
 });
+
+test('colunas desconhecidas são preservadas e duplicidades de campos bloqueiam a importação',()=>{
+ const extra=parseBorderoCsv(file([[...header,'Campo extra'],[...row(),'Valor original']]),'modelo.csv');
+ assert.match(extra.warnings.join(' '),/Coluna não reconhecida/);
+ assert.equal(extra.rows[0].raw['Campo extra'],'Valor original');
+ const duplicate=parseBorderoCsv(file([[...header,'Vencimento'],[...row(),'28/01/2026']]),'modelo.csv');
+ assert.ok(duplicate.errors.some(e=>/Colunas duplicadas para due_date/.test(e.error)));
+});
+
+test('prévia bloqueia credor divergente antes da confirmação de importação',()=>{
+ const bytes=file([header,row()]);
+ assert.equal(parseBorderoCsv(bytes,'modelo.csv',{document:'29037742000173',name:'EMPRESA TESTE LTDA'}).errors.length,0);
+ const wrong=parseBorderoCsv(bytes,'modelo.csv',{document:'11111111111111',name:'OUTRA CARTEIRA'});
+ assert.ok(wrong.errors.some(e=>/CNPJ do arquivo/.test(e.error)));
+ assert.ok(wrong.errors.some(e=>/Nome do credor/.test(e.error)));
+});
+
+
+test('regressão de layout ELISATEX: 14 lançamentos, 24 colunas, CP1252, identificador composto repetido 3 vezes',()=>{
+ const refs=['DOC-A','LOTE-B,C','DOC-C','LOTE-B,C','DOC-D','DOC-E','DOC-F','RENEGOCIAÇÃO','LOTE-B,C','DOC-G','DOC-H','DOC-I','DOC-J','DOC-K'];
+ const dates=['27/01/2026','02/02/2026','02/03/2026','02/03/2026','05/03/2026','09/03/2026','13/03/2026','20/03/2026','31/03/2026','07/04/2026','28/04/2026','05/05/2026','07/05/2026','11/05/2026'];
+ const values=Array(14).fill('1.000,00');
+ const rows=refs.map((ref,i)=>row(dates[i],ref,'R$ '+values[i]));
+ const parsed=parseBorderoCsv(file([header,...rows],'latin1'),'Layout Padrão ELISATEX.csv');
+ assert.equal(parsed.count,14);
+ assert.equal(parsed.total,'14000.00');
+ assert.equal(parsed.errors.length,0);
+ assert.equal(parsed.needs_confirmation,true);
+ assert.equal(parsed.rows.filter(x=>x.repeated_title).length,3);
+ assert.equal(new Set(parsed.rows.map(x=>x.external_ref)).size,14);
+ assert.ok(parsed.warnings.some(x=>/credor invertidos/i.test(x)));
+ assert.ok(parsed.warnings.some(x=>/Windows-1252/i.test(x)));
+ assert.ok(parsed.warnings.some(x=>/mesmo identificador/i.test(x)));
+ // Todos os documentos, identificadores, empresas e valores da amostra são fictícios.
+});
