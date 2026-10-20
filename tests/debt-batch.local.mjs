@@ -31,6 +31,7 @@ const d1=await create(a,'A1'),d2=await create(a,'A2'),d3=await create(b,'B1'),d4
 const owner=async id=>(await rpc('detail',{id})).process.assigned_to;
 assert.equal(await owner(d1.id),await owner(d2.id));assert.equal(await owner(d1.id),await owner(d4.id));assert.notEqual(await owner(d1.id),await owner(d3.id));
 await rpc('distribute',{ids:[d1.id],assigned_to:second,reason:'Redistribuição por empresa'});assert.equal(await owner(d2.id),second);assert.equal(await owner(d4.id),second);
+await rpc('distribute',{ids:[d1.id],assigned_to:admin,reason:'Preservar responsável administrativo existente'});const d5=await create(a,'A4');assert.equal(await owner(d5.id),admin);
 const ids=[d1.id,d2.id];let preview=await rpc('debt_delete_preview',{ids});assert.equal(preview.count,2);assert.equal(Number(preview.total),200);assert.equal(preview.blocked,0);
 await assert.rejects(()=>rpc('debt_delete_commit',{ids,token:preview.token,reason:'Teste de confirmação'}));
 await assert.rejects(()=>rpc('debt_delete_commit',{ids,token:'forged',reason:'Importação incorreta',confirmation:'EXCLUIR'}));

@@ -14,6 +14,10 @@ test('provider records keep direction and isolate direct WhatsApp conversations'
  const rows=evolutionMessages({messages:{records:[{key:{id:'one',remoteJid:'5547999990000@s.whatsapp.net',fromMe:false},message:{conversation:'Resposta'}},{key:{id:'group',remoteJid:'111@g.us'},message:{conversation:'Grupo'}}]}});
  assert.equal(rows.length,1);assert.equal(rows[0].address,'5547999990000');assert.equal(rows[0].content,'Resposta');assert.equal(rows[0].from_me,false);
 });
+test('WhatsApp uses the phone alternate for LID conversations without treating a LID as a phone',()=>{
+ const rows=evolutionMessages({messages:{records:[{key:{id:'lid-one',remoteJid:'123456789012345@lid',remoteJidAlt:'5547999990000@s.whatsapp.net',fromMe:false},message:{conversation:'Resposta LID'}},{key:{id:'unresolved',remoteJid:'998877665544332@lid'},message:{conversation:'Identidade sem telefone'}}]}});
+ assert.equal(rows.length,1);assert.equal(rows[0].address,'5547999990000');assert.equal(rows[0].provider_ref,'123456789012345@lid');
+});
 test('IMAP reads without marking or deleting mail and retains original content and attachment metadata',async()=>{
  let released=false,loggedOut=false,readOnly=false;
  const raw=Buffer.from('From: Cliente <client@example.invalid>\r\nTo: team@example.invalid\r\nSubject: Resposta\r\nMessage-ID: <reply@example.invalid>\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<p>Resposta <b>original</b></p><img src="https://tracking.example.invalid/1">');
@@ -26,4 +30,3 @@ test('WhatsApp sends once and records uncertain outcomes without automatic retry
  let calls=0,finished;const rpc=async(kind,action)=>{if(action==='profile')return profile;if(action==='message_claim')return{account,thread:{address:'5547999990000'},message:{content:'Teste',attachments:[]}};if(action==='message_finish'){finished=true;return{};}throw Error(action);};
  const original=globalThis.fetch;try{globalThis.fetch=async()=>{calls++;throw Error('timeout');};await assert.rejects(()=>handleAttendance('attend_send',{thread_id:'thread',message_id:'message'},rpc,env),/Envio sem confirmação/);assert.equal(calls,1);assert.equal(finished,true);}finally{globalThis.fetch=original;}
 });
-
