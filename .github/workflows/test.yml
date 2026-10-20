@@ -28,3 +28,7 @@ jobs:
       - run: node --check web/app.mjs && node --check server.mjs
 
       - run: node tests/contract-calculation.local.mjs
+
+      - run: node tests/contract-periods.local.mjs
+
+      - run: node tests/fee-age.local.mjs
