@@ -32,3 +32,5 @@ jobs:
       - run: node tests/contract-periods.local.mjs
 
       - run: node tests/fee-age.local.mjs
+
+      - run: node tests/negotiation-rates.local.mjs
