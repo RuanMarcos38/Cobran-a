@@ -76,3 +76,5 @@ html[data-theme=dark] .attendance-separated.attendance-email :is(.attendance-wel
 
 /* Keep reply actions reachable while a long composer scrolls in a short window. */
 .attendance-separated.attendance-email .attendance-compose-actions{position:sticky;bottom:0;z-index:2;background:var(--mail-bg);padding:8px 0 0;border-top:1px solid var(--mail-line)}
+
+.attendance-separated.attendance-email [data-mail-purge],.attendance-separated.attendance-email [data-mail-empty]{color:#a52d2d}.attendance-separated.attendance-email .attendance-filters{flex-wrap:wrap}.attendance-separated.attendance-email .attendance-header button{white-space:normal}

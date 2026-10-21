@@ -36,3 +36,5 @@ jobs:
       - run: node tests/negotiation-rates.local.mjs
 
       - run: node tests/tenant-isolation.local.mjs
+
+      - run: node tests/mail-trash.local.mjs
