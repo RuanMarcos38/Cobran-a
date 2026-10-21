@@ -41,3 +41,13 @@ test('invalid recipients and disconnected instances do not claim or send a messa
   phone='5547999371478';await assert.rejects(()=>handleAttendance('attend_send',{account_id:'account',thread_id:'thread'},rpc,env),/desconectado/);assert.equal(sent,1);assert.equal(claimed,0);
  }finally{globalThis.fetch=original;}
 });
+
+test('WhatsApp Business system address zero cannot reject the whole received batch',()=>{
+ const rows=evolutionMessages({messages:{records:[
+  {key:{id:'system',remoteJid:'0@s.whatsapp.net'},message:{conversation:'Aviso WhatsApp Business'}},
+  {key:{id:'contact',remoteJid:'5547999371478@s.whatsapp.net'},message:{conversation:'Resposta válida'}},
+  {key:{id:'alt',remoteJid:'0@s.whatsapp.net',remoteJidAlt:'5547999371478@s.whatsapp.net'},message:{conversation:'Alternativo válido'}},
+  {key:{id:'status',remoteJid:'status@broadcast'},message:{conversation:'Status'}}
+ ]}});
+ assert.deepEqual(rows.map(x=>x.provider_id),['contact','alt']);assert.ok(rows.every(x=>x.address==='5547999371478'));
+});
