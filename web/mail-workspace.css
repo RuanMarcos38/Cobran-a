@@ -73,3 +73,6 @@
 html[data-theme=dark] .attendance-email{--mail-bg:#1d2c3d;--mail-panel:#24364b;--mail-line:#3b5068;--mail-text:#e0e8f2;--mail-muted:#b5c6d8}
 html[data-theme=dark] .attendance-separated.attendance-email :is(.attendance-welcome,.mail-list-item:hover){background:#24364b}html[data-theme=dark] .attendance-separated.attendance-email :is(.mail-list-item.active,[data-mail-folder].active){background:#304e70;color:#e0e8f2}
 @media print{.app-main:has(.attendance-email),.app-main:has(.attendance-email)>.workspace,:is(#content,#preview):has(>.attendance-email),.attendance-separated.attendance-email{height:auto;max-height:none;overflow:visible}.attendance-separated.attendance-email .mail-folders,.attendance-separated.attendance-email .attendance-list,.attendance-separated.attendance-email .attendance-composer{display:none}.attendance-separated.attendance-email .attendance-pane,.attendance-separated.attendance-email .attendance-messages{display:block;overflow:visible}}
+
+/* Keep reply actions reachable while a long composer scrolls in a short window. */
+.attendance-separated.attendance-email .attendance-compose-actions{position:sticky;bottom:0;z-index:2;background:var(--mail-bg);padding:8px 0 0;border-top:1px solid var(--mail-line)}
