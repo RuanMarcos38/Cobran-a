@@ -41,3 +41,21 @@ test('invalid recipients and disconnected instances do not claim or send a messa
   phone='5547999371478';await assert.rejects(()=>handleAttendance('attend_send',{account_id:'account',thread_id:'thread'},rpc,env),/desconectado/);assert.equal(sent,1);assert.equal(claimed,0);
  }finally{globalThis.fetch=original;}
 });
+
+test('WhatsApp Business system address zero cannot reject the whole received batch',()=>{
+ const rows=evolutionMessages({messages:{records:[
+  {key:{id:'system',remoteJid:'0@s.whatsapp.net'},message:{conversation:'Aviso WhatsApp Business'}},
+  {key:{id:'contact',remoteJid:'5547999371478@s.whatsapp.net'},message:{conversation:'Resposta válida'}},
+  {key:{id:'alt',remoteJid:'0@s.whatsapp.net',remoteJidAlt:'5547999371478@s.whatsapp.net'},message:{conversation:'Alternativo válido'}},
+  {key:{id:'status',remoteJid:'status@broadcast'},message:{conversation:'Status'}}
+ ]}});
+ assert.deepEqual(rows.map(x=>x.provider_id),['contact','alt']);assert.ok(rows.every(x=>x.address==='5547999371478'));
+});
+
+test('sending cannot use a different mailbox account from the message thread',async()=>{
+ const env={EMAIL_ENCRYPTION_KEY:'ab'.repeat(32)};
+ const account={id:'mail-one',channel:'email',cipher:encrypt(JSON.stringify({address:'one@example.invalid'}),'tenant:attendance:mail-one',env)};
+ let claims=0;
+ const rpc=async(kind,action)=>{if(action==='profile')return{tenant_id:'tenant',role:'admin'};if(action==='account_secret')return account;if(action==='thread_messages')return{thread:{account_id:'mail-two'}};claims++;throw Error('Unexpected mutation');};
+ await assert.rejects(()=>handleAttendance('attend_send',{account_id:'mail-one',thread_id:'thread'},rpc,env),/não pertence/);assert.equal(claims,0);
+});

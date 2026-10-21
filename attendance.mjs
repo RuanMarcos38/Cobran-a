@@ -29,7 +29,7 @@ export function evolutionContacts(data){
 export function contactThreads(rows,names){return rows.map(t=>({...t,name:names.get(t.address)||validContactName(t.name)||t.address}));}
 async function whatsappNames(cfg){const results=await Promise.allSettled([evolution(cfg,'/chat/findContacts/'+encodeURIComponent(cfg.instance),{where:{}}),evolution(cfg,'/chat/findMessages/'+encodeURIComponent(cfg.instance),{where:{},page:1,offset:100})]);const names=results[0].status==='fulfilled'?evolutionContacts(results[0].value):new Map();if(results[1].status==='fulfilled')for(const m of evolutionMessages(results[1].value))if(m.name!==m.address&&!names.has(m.address))names.set(m.address,m.name);return names;}
 export function evolutionMessages(data){
- const rows=(data?.messages?.records||data?.records||[]).map(x=>({...x,phoneJid:[x.key?.remoteJid,x.key?.remoteJidAlt].find(j=>typeof j==='string'&&j.endsWith('@s.whatsapp.net'))}));
+ const rows=(data?.messages?.records||data?.records||[]).map(x=>({...x,phoneJid:[x.key?.remoteJid,x.key?.remoteJidAlt].find(j=>typeof j==='string'&&/^[1-9][0-9]{11,14}@s\.whatsapp\.net$/.test(j))}));
  return rows.filter(x=>x.phoneJid&&x.key?.id).slice(0,100).map(x=>{
   const media=x.message?.imageMessage||x.message?.audioMessage||x.message?.documentMessage;
   return {provider_id:x.key.id,provider_ref:x.key.remoteJid,address:x.phoneJid.split('@')[0],name:(x.key.fromMe!==true&&validContactName(x.pushName))||x.phoneJid.split('@')[0],content:String(x.message?.conversation||x.message?.extendedTextMessage?.text||media?.caption||(media?'[Anexo recebido]':'[Mensagem não textual]')).slice(0,100000),attachments:media?[{index:0,name:media.fileName||(x.message.audioMessage?'audio.ogg':'anexo'),mime:media.mimetype||'application/octet-stream',size:Number(media.fileLength)||0,remote:true}]:[],created_at:new Date(Number(x.messageTimestamp)*1000||Date.now()).toISOString(),from_me:x.key.fromMe===true};
@@ -113,9 +113,9 @@ export async function handleAttendance(operation,body,rpc,env=process.env){
   }finally{await client.logout().catch(()=>{});}
  }
  if(operation!=='attend_send')throw publicError('Operação inválida.');
+ const detail=await rpc('attend','thread_messages',{thread_id:body.thread_id});
+ if(detail.thread.account_id!==account.id)throw publicError('Conversa não pertence a esta conta.');
  if(account.channel==='whatsapp'){
-  const detail=await rpc('attend','thread_messages',{thread_id:body.thread_id});
-  if(detail.thread.account_id!==account.id)throw publicError('Conversa não pertence a esta conta.');
   try{validateWhatsappNumber(detail.thread.address);}catch(e){throw publicError(e.message);}
   const state=await evolution(cfg,'/instance/connectionState/'+encodeURIComponent(cfg.instance));
   if(state.instance?.state!=='open')throw publicError('WhatsApp desconectado. Abra Conexão e conecte o número desta conta antes de enviar. Nenhuma mensagem foi enviada.');
