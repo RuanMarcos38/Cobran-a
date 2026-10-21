@@ -12,6 +12,7 @@ for(const name of ['supabase-schema.sql',...files]){
  }catch(e){console.error('MIGRATION',name,e.message);throw e;}
 }
 await db.exec('reset role');const sample={principal:1000,interest:100,fine:20,fees:112,total:1232,configured:true,snapshot:'original',terms:{interest_percent:1,fine_percent:2,fee_percent:10,fee_basis:'updated'}};const calc=(await db.query('select cobranca_private.negotiated_quote($1,$2) q',[JSON.stringify(sample),JSON.stringify({interest_percent:'0.5',fine_percent:'1',fee_percent:'5'})])).rows[0].q;assert.equal(Number(calc.interest),50);assert.equal(Number(calc.fine),10);assert.equal(Number(calc.fees),53);assert.equal(Number(calc.total),1113);
+const penny={...sample,principal:6606.30,interest:319.30,fine:132.13,fees:635.20,total:7692.93,days:145,terms:{...sample.terms,mode:'monthly',fee_percent:9}};const exact=(await db.query('select cobranca_private.negotiated_quote($1,$2) q',[JSON.stringify(penny),JSON.stringify({interest_percent:'0.5',fine_percent:'1',fee_percent:'5'})])).rows[0].q;assert.equal(Number(exact.interest),159.65);assert.equal(Number(exact.fine),66.06);assert.equal(Number(exact.fees),341.60);assert.equal(Number(exact.total),7173.61);
 const tenant='00000000-0000-0000-0000-000000000000';
 const tenantB='88888888-8888-4888-8888-888888888888';
 const admin='11111111-1111-4111-8111-111111111111',finance='22222222-2222-4222-8222-222222222222',other='33333333-3333-4333-8333-333333333333',collector='44444444-4444-4444-8444-444444444444';
