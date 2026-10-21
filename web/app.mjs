@@ -1,3 +1,4 @@
+import {installDatePickers} from './date-picker.mjs';
 import {navigationGroups,navigationLocation,routeHash,parseRoute} from './navigation.mjs';
 import {openNegotiation,openJointNegotiation} from './negotiation.mjs';
 import {renderAttendance} from './attendance.mjs';
@@ -154,3 +155,5 @@ installPasswordControls();
 installWindowControls();
 await api.init();if(api.authenticated()){try{await start();}catch(e){loginView();notify(e.message);}}else loginView();
 
+
+installDatePickers();

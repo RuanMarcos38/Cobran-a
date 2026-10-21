@@ -38,3 +38,5 @@ jobs:
       - run: node tests/tenant-isolation.local.mjs
 
       - run: node tests/mail-trash.local.mjs
+
+      - run: node tests/financial-calendar.local.mjs
