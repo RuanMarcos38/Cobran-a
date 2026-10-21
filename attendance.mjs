@@ -113,9 +113,9 @@ export async function handleAttendance(operation,body,rpc,env=process.env){
   }finally{await client.logout().catch(()=>{});}
  }
  if(operation!=='attend_send')throw publicError('Operação inválida.');
+ const detail=await rpc('attend','thread_messages',{thread_id:body.thread_id});
+ if(detail.thread.account_id!==account.id)throw publicError('Conversa não pertence a esta conta.');
  if(account.channel==='whatsapp'){
-  const detail=await rpc('attend','thread_messages',{thread_id:body.thread_id});
-  if(detail.thread.account_id!==account.id)throw publicError('Conversa não pertence a esta conta.');
   try{validateWhatsappNumber(detail.thread.address);}catch(e){throw publicError(e.message);}
   const state=await evolution(cfg,'/instance/connectionState/'+encodeURIComponent(cfg.instance));
   if(state.instance?.state!=='open')throw publicError('WhatsApp desconectado. Abra Conexão e conecte o número desta conta antes de enviar. Nenhuma mensagem foi enviada.');

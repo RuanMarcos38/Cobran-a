@@ -51,3 +51,11 @@ test('WhatsApp Business system address zero cannot reject the whole received bat
  ]}});
  assert.deepEqual(rows.map(x=>x.provider_id),['contact','alt']);assert.ok(rows.every(x=>x.address==='5547999371478'));
 });
+
+test('sending cannot use a different mailbox account from the message thread',async()=>{
+ const env={EMAIL_ENCRYPTION_KEY:'ab'.repeat(32)};
+ const account={id:'mail-one',channel:'email',cipher:encrypt(JSON.stringify({address:'one@example.invalid'}),'tenant:attendance:mail-one',env)};
+ let claims=0;
+ const rpc=async(kind,action)=>{if(action==='profile')return{tenant_id:'tenant',role:'admin'};if(action==='account_secret')return account;if(action==='thread_messages')return{thread:{account_id:'mail-two'}};claims++;throw Error('Unexpected mutation');};
+ await assert.rejects(()=>handleAttendance('attend_send',{account_id:'mail-one',thread_id:'thread'},rpc,env),/não pertence/);assert.equal(claims,0);
+});
