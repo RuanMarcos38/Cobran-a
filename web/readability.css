@@ -60,3 +60,7 @@ html[data-theme=dark] .negotiation-calculation-status{background:#183a2c;color:#
  .negotiation-dialog .negotiation-balances{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.negotiation-dialog .negotiation-balances strong{font-size:18px}.negotiation .negotiation-rate input{font-size:16px;min-height:44px}.negotiation-calculation-status{font-size:14px}.negotiation-ledger-tools button{min-height:44px}
  .attendance.wa-workspace .wa-search input{font-size:16px}.commercial-board .board-filters :is(input,select){font-size:16px;min-height:44px}}
 @media print{.negotiation-ledger-tools button,.negotiation-calculation-status{display:none}.workspace{margin-bottom:0}}
+
+/* Legacy table cells set their own light-theme text color. */
+html[data-theme=dark] #content .table-wrap td,html[data-theme=dark] dialog .table-wrap td{color:#dce6f2}
+html[data-theme=dark] .commercial-board :is(.board-contact small,.board-guidance,.board-scroll-hint,.board-card-stage label,.board-filters label,.board-empty){color:#b8c8d9}
