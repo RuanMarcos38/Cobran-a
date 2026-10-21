@@ -81,13 +81,14 @@ export async function openNegotiation({api,modal,notify,guard,profile,refresh},i
  if(canExportProposal(profile))for(const format of ['pdf','xlsx'])dialog.querySelector('[data-proposal-'+format+']').onclick=()=>guard(async()=>{const authorized=await authorizeProposalExport(api);if(ratePending||refreshFailed||!lastSimulation)throw Error('Aguarde o recálculo válido antes de exportar.');const fresh=await api.rpc('quote',quotePayload());if(fresh.snapshot!==quote.snapshot||fresh.as_of!==quote.as_of||cents(fresh.total)!==cents(quote.total)){quote=fresh;form.elements.accepted.checked=false;draw();throw Error('Saldo atualizado. Confira a proposta e exporte novamente.');}downloadProposal(detail,quote,lastSimulation,format,authorized);});
  collectionComposer(dialog.querySelector('[data-collection-composer]'),{api,guard,notify,context:()=>({debtor:detail.debtor,creditor:detail.creditor,quote,simulation:lastSimulation,sender:profile.tenant_name||'Equipe de cobrança'}),beforeSend:async()=>{if(ratePending||refreshFailed)throw Error('Aguarde o recálculo válido.');const fresh=await api.rpc('quote',quotePayload());if(fresh.snapshot!==quote.snapshot||fresh.as_of!==quote.as_of||cents(fresh.total)!==cents(quote.total)){quote=fresh;form.elements.accepted.checked=false;draw();throw Error('O saldo mudou. Gere e revise o texto novamente antes de enviar.');}}});
  draw();
- const stopRefresh=watchNegotiationQuote({active:()=>dialog.open&&dialog.isConnected&&!finalized,visible:()=>document.visibilityState==='visible'&&!quoteBusy&&!ratePending,load:()=>api.rpc('quote',quotePayload()),apply:fresh=>{
-  if(quoteBusy)return;
+ let refreshRevision=0;
+ const stopRefresh=watchNegotiationQuote({active:()=>dialog.open&&dialog.isConnected&&!finalized,visible:()=>document.visibilityState==='visible'&&!quoteBusy&&!ratePending,load:()=>{refreshRevision=recalculation.revision;return api.rpc('quote',quotePayload());},apply:fresh=>{
+  if(quoteBusy||refreshRevision!==recalculation.revision)return;
   const changed=fresh.snapshot!==quote.snapshot||fresh.as_of!==quote.as_of||cents(fresh.total)!==cents(quote.total);
   refreshFailed=false;if(changed){quote=fresh;form.elements.accepted.checked=false;draw();}
   else if(error.textContent.includes('atualização do saldo'))draw();
   dialog.querySelector('[data-quote-sync]').textContent='Conferido às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'});
- },failed:()=>{refreshFailed=true;draw();dialog.querySelector('[data-quote-sync]').textContent='Reconectando para atualizar…';},events:[[window,'focus'],[document,'visibilitychange']]});
+ },failed:()=>{if(quoteBusy||refreshRevision!==recalculation.revision)return;refreshFailed=true;draw();dialog.querySelector('[data-quote-sync]').textContent='Reconectando para atualizar…';},events:[[window,'focus'],[document,'visibilitychange']]});
  dialog.addEventListener('close',()=>{recalculation.stop();stopRefresh();},{once:true});
  return dialog;
 }

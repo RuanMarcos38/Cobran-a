@@ -7,6 +7,7 @@ export function createRateRecalculation({load,apply,pending,failed,schedule=setT
   catch(error){if(stopped||ticket!==generation)return;pending(false);failed(error);}
  }
  return {
+  get revision(){return generation;},
   queue(){if(stopped)return;const ticket=invalidate();timer=schedule(()=>run(ticket),delay);},
   recalculate(){if(stopped)return;return run(invalidate());},
   invalidate,
