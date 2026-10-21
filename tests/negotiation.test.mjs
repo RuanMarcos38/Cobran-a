@@ -21,3 +21,13 @@ test('invalid offers cannot exceed authorization or create zero-value installmen
 });
 
 test('negotiated charge reductions and additional discounts share the same approval limit',()=>{const p={discount_percent:'0',down_payment:'0',installments:'1',first_due_date:'2027-01-01'};assert.throws(()=>simulateNegotiation({total:'800',contract_total:'1000'},p,10),/alçada/);assert.equal(simulateNegotiation({total:'900',contract_total:'1000'},p,10).total,'900.00');assert.throws(()=>simulateNegotiation({total:'900',contract_total:'1000'},{...p,discount_percent:'1'},10),/alçada/);});
+
+test('weekly and fortnightly schedules cross months and leap day with exact cents',()=>{
+ const proposal={discount_percent:'0',down_payment:'1.01',installments:'4',first_due_date:'2028-02-23'};
+ for(const [frequency,dates] of [['weekly',['2028-02-23','2028-02-23','2028-03-01','2028-03-08','2028-03-15']],['fortnightly',['2028-02-23','2028-02-23','2028-03-09','2028-03-24','2028-04-08']]]){
+  const s=simulateNegotiation({total:'100.05'},{...proposal,payment_frequency:frequency},100);
+  assert.equal(s.payment_frequency,frequency);assert.deepEqual(s.schedule.map(p=>p.due_date),dates);
+  assert.equal(s.schedule.reduce((sum,p)=>sum+cents(p.amount),0n),10005n);
+ }
+ assert.throws(()=>simulateNegotiation({total:'100'},{...proposal,payment_frequency:'invalid'},100),/periodicidade/);
+});

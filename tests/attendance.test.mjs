@@ -27,6 +27,17 @@ test('IMAP reads without marking or deleting mail and retains original content a
 test('WhatsApp sends once and records uncertain outcomes without automatic retry',async()=>{
  const env={EMAIL_ENCRYPTION_KEY:'ab'.repeat(32)};const profile={tenant_id:'tenant',role:'collector'};
  const account={id:'account',channel:'whatsapp',cipher:encrypt(JSON.stringify({url:'https://provider.example.invalid',apikey:'test-only',instance:'dedicated-test'}),'tenant:attendance:account',env)};
- let calls=0,finished;const rpc=async(kind,action)=>{if(action==='profile')return profile;if(action==='message_claim')return{account,thread:{address:'5547999990000'},message:{content:'Teste',attachments:[]}};if(action==='message_finish'){finished=true;return{};}throw Error(action);};
- const original=globalThis.fetch;try{globalThis.fetch=async()=>{calls++;throw Error('timeout');};await assert.rejects(()=>handleAttendance('attend_send',{thread_id:'thread',message_id:'message'},rpc,env),/Envio sem confirmação/);assert.equal(calls,1);assert.equal(finished,true);}finally{globalThis.fetch=original;}
+ let calls=0,finished;const rpc=async(kind,action)=>{if(action==='profile')return profile;if(action==='account_secret')return account;if(action==='thread_messages')return{thread:{account_id:'account',address:'5547999990000'}};if(action==='message_claim')return{account,thread:{address:'5547999990000'},message:{content:'Teste',attachments:[]}};if(action==='message_finish'){finished=true;return{};}throw Error(action);};
+ const original=globalThis.fetch;try{globalThis.fetch=async(url)=>{if(url.includes('/connectionState/'))return{ok:true,json:async()=>({instance:{state:'open'}})};calls++;throw Error('timeout');};await assert.rejects(()=>handleAttendance('attend_send',{thread_id:'thread',message_id:'message'},rpc,env),/Envio sem confirmação/);assert.equal(calls,1);assert.equal(finished,true);}finally{globalThis.fetch=original;}
+});
+
+test('invalid recipients and disconnected instances do not claim or send a message',async()=>{
+ const env={EMAIL_ENCRYPTION_KEY:'ab'.repeat(32)},profile={tenant_id:'tenant',role:'collector'};
+ const account={id:'account',channel:'whatsapp',cipher:encrypt(JSON.stringify({url:'https://provider.example.invalid',apikey:'test-only',instance:'dedicated-test'}),'tenant:attendance:account',env)};
+ let phone='55479993714',claimed=0,sent=0;
+ const rpc=async(kind,action)=>{if(action==='profile')return profile;if(action==='account_secret')return account;if(action==='thread_messages')return{thread:{account_id:'account',address:phone}};if(action==='message_claim')claimed++;throw Error('Unexpected mutation');};
+ const original=globalThis.fetch;try{globalThis.fetch=async()=>{sent++;return{ok:true,json:async()=>({instance:{state:'close'}})};};
+  await assert.rejects(()=>handleAttendance('attend_send',{account_id:'account',thread_id:'thread'},rpc,env),/Telefone incompleto/);assert.equal(sent,0);assert.equal(claimed,0);
+  phone='5547999371478';await assert.rejects(()=>handleAttendance('attend_send',{account_id:'account',thread_id:'thread'},rpc,env),/desconectado/);assert.equal(sent,1);assert.equal(claimed,0);
+ }finally{globalThis.fetch=original;}
 });

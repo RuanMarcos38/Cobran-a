@@ -4,7 +4,7 @@ const date=s=>String(s||'').split('-').reverse().join('/');
 export function proposalRows(detail,quote,s){
  const items=quote.items||[{reference:detail.process.external_ref,quote:{...quote,due_date:detail.process.due_date}}];
  return [
-  [s.formalized?'ACORDO FORMALIZADO':'PROPOSTA DE NEGOCIAÇÃO — SIMULAÇÃO'],['Devedor',detail.debtor.name],['Credor',detail.creditor.name],['Atualização',date(quote.as_of)],['Situação',s.formalized?'Acordo registrado no sistema; não comprova pagamento.':'Sujeita à conferência do saldo e aceite; não comprova pagamento.'],
+  [s.formalized?'ACORDO FORMALIZADO':'PROPOSTA DE NEGOCIAÇÃO — SIMULAÇÃO'],['Devedor',detail.debtor.name],['Credor',detail.creditor.name],['Atualização',date(quote.as_of)],['Periodicidade das parcelas',({monthly:'Mensal',weekly:'Semanal — a cada 7 dias',fortnightly:'Quinzenal — a cada 15 dias'}[s.payment_frequency||'monthly'])],['Situação',s.formalized?'Acordo registrado no sistema; não comprova pagamento.':'Sujeita à conferência do saldo e aceite; não comprova pagamento.'],
   ['Principal',Number(quote.principal)],['Juros',Number(quote.interest)],['Multa',Number(quote.fine)],['Honorários',Number(quote.fees||0)],['Saldo atualizado',Number(quote.total)],['Desconto',Number(s.discount)],['Total negociado',Number(s.total)],['Entrada',Number(s.entry)],[],
   ['Título','Vencimento','Dias após carência','Principal','Juros','Multa','Honorários','Saldo','Juros (%)','Periodicidade','Multa (%)','Honorários (%)','Base honorários'],
   ...items.map(({reference,quote:q})=>[reference,date(q.due_date),q.days||0,Number(q.principal),Number(q.interest),Number(q.fine),Number(q.fees||0),Number(q.total),Number(q.terms?.interest_percent||0),({monthly:'Mensal / 30 dias',daily:'Diário',none:'Sem juros'}[q.terms?.mode]||'Sem juros'),Number(q.terms?.fine_percent||0),Number(q.terms?.fee_percent||0),q.terms?.fee_basis==='updated'?'Saldo com encargos':'Principal']),[],
@@ -47,7 +47,7 @@ export function proposalXlsx(rows){
  const last=out.length;
  add(['TOTAL','','',Number(d.get('Principal')),Number(d.get('Juros')),Number(d.get('Multa')),Number(d.get('Honorários')),Number(d.get('Saldo atualizado'))],5,28);
  wide('Base “Saldo com encargos”: principal + juros + multa. Dias apresentados já consideram a carência contratual.',3,30);
- wide('03  CONDIÇÕES DE PAGAMENTO',2,28);
+ wide('03  CONDIÇÕES DE PAGAMENTO',2,28);wide('Periodicidade das parcelas: '+d.get('Periodicidade das parcelas'),0,26);
  add(['Pagamento','Vencimento','Valor (R$)'],1,28);
  for(const row of d.payments)add(row,7,24);
  add(['Total negociado','',Number(d.get('Total negociado'))],5,28);
@@ -94,7 +94,7 @@ export function proposalPdf(rows){
  }
  paragraph('Honorários sobre saldo com encargos = principal + juros + multa. Os dias informados já consideram a carência contratual.',9,'52677F');
  // Keep short schedules together instead of leaving a few installments on a new page.
- need(Math.min(630,120+d.payments.length*26));section('03  CONDIÇÕES DE PAGAMENTO');
+ need(Math.min(630,120+d.payments.length*26));section('03  CONDIÇÕES DE PAGAMENTO');text('Periodicidade: '+d.get('Periodicidade das parcelas'),44,y+2,10);y+=22;
  const paymentHeader=()=>{box(36,y-12,523,25,brand.pale);text('Pagamento',44,y+4,10,true);text('Vencimento',308,y+4,10,true);text('Valor (R$)',455,y+4,10,true);y+=30;};paymentHeader();
  for(const [i,p] of d.payments.entries()){if(y+30>778){newPage();section('CONDIÇÕES DE PAGAMENTO — CONTINUAÇÃO');paymentHeader();}if(i%2===0)box(36,y-12,523,25,'F8FAFC');text(p[0],44,y+4,10);text(p[1],308,y+4,10);right(brl(p[2]),549,y+4,10,true);y+=26;}
  need(48);text('Total negociado',44,y+10,11,true);right(brl(d.get('Total negociado')),549,y+10,11,true);y+=38;

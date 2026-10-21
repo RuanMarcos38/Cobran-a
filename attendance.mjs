@@ -5,7 +5,7 @@ import {ImapFlow} from 'imapflow';
 import {simpleParser} from 'mailparser';
 import sanitizeHtml from 'sanitize-html';
 import {encrypt,decrypt,sender} from './email.mjs';
-import {sendEvolution} from './evolution.mjs';
+import {sendEvolution,validateWhatsappNumber} from './evolution.mjs';
 const publicError=message=>Object.assign(Error(message),{public:true});
 const administrators=['admin','master'];
 export const safeEmailHtml=html=>sanitizeHtml(String(html||'').slice(0,100000),{allowedTags:['p','br','div','span','b','strong','i','em','u','ul','ol','li','table','thead','tbody','tr','th','td','h1','h2','h3','blockquote','hr','pre','a'],allowedAttributes:{a:['href','title'],td:['colspan','rowspan'],th:['colspan','rowspan']},allowedSchemes:['https','http','mailto'],allowProtocolRelative:false});
@@ -69,7 +69,8 @@ export async function handleAttendance(operation,body,rpc,env=process.env){
   return rpc('attend','account_save',{id,name:body.name,sector:body.sector,channel:body.channel,address:body.address,members:body.members||[],cipher:encrypt(JSON.stringify(cfg),aad(id),env)});
  }
  let claimed;
- if(operation==='attend_send')claimed=await rpc('attend','message_claim',body);
+ // Validate the account, recipient and connection before claiming a message.
+ // A failed preflight must not turn an unsent draft into an uncertain delivery.
  const account=claimed?.account||await rpc('attend','account_secret',{account_id:body.account_id});
  let cfg;try{cfg=JSON.parse(decrypt(account.cipher,aad(account.id),env));}catch{
   if(claimed)await rpc('attend','message_finish',{...body,status:'unknown'}).catch(()=>{});
@@ -111,7 +112,15 @@ export async function handleAttendance(operation,body,rpc,env=process.env){
    }finally{lock.release();}
   }finally{await client.logout().catch(()=>{});}
  }
- if(operation!=='attend_send'||!claimed)throw publicError('Operação inválida.');
+ if(operation!=='attend_send')throw publicError('Operação inválida.');
+ if(account.channel==='whatsapp'){
+  const detail=await rpc('attend','thread_messages',{thread_id:body.thread_id});
+  if(detail.thread.account_id!==account.id)throw publicError('Conversa não pertence a esta conta.');
+  try{validateWhatsappNumber(detail.thread.address);}catch(e){throw publicError(e.message);}
+  const state=await evolution(cfg,'/instance/connectionState/'+encodeURIComponent(cfg.instance));
+  if(state.instance?.state!=='open')throw publicError('WhatsApp desconectado. Abra Conexão e conecte o número desta conta antes de enviar. Nenhuma mensagem foi enviada.');
+ }
+ claimed=await rpc('attend','message_claim',body);
  const {message,thread}=claimed;let provider_id;
  try{
   if(account.channel==='whatsapp'){

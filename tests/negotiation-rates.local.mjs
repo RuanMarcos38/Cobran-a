@@ -37,4 +37,17 @@ await assert.rejects(()=>joint('quote',{ids,rate_overrides:{[ids[0]]:{interest_p
 await db.exec('reset role');await db.exec("update public.cobranca_profiles set discount_limit=0 where id='"+collector+"'");await as(collector);await assert.rejects(()=>joint('formalize',{...data,discount_percent:'0',rate_overrides:rates,expected_snapshot:changed.snapshot}));await as(admin);
 const updatedData={...data,rate_overrides:rates,expected_snapshot:changed.snapshot};const revised=simulateNegotiation(changed,updatedData,100);Object.assign(sim,revised);const result=await joint('formalize',updatedData);assert.equal(Number(result.total),Number(sim.total));assert.equal(result.schedule.length,sim.schedule.length);for(let i=0;i<sim.schedule.length;i++){assert.equal(Number(result.schedule[i].amount),Number(sim.schedule[i].amount));assert.equal(result.schedule[i].due_date,sim.schedule[i].due_date);}
 let total=0;const columns=new Map();for(const id of ids){const d=await rpc('detail',{id});assert.equal(d.agreements.length,1);assert.equal(d.process.metadata.agreement_group_id,result.group_id);total+=Math.round(Number(d.agreements[0].total_amount)*100);assert.equal(d.installments.reduce((n,x)=>n+Math.round(Number(x.amount)*100),0),Math.round(Number(d.agreements[0].total_amount)*100));for(const i of d.installments)columns.set(i.installment_number,(columns.get(i.installment_number)||0)+Math.round(Number(i.amount)*100));}assert.equal(total,Math.round(Number(sim.total)*100));for(const p of result.schedule)assert.equal(columns.get(p.number),Math.round(Number(p.amount)*100));await assert.rejects(()=>joint('formalize',data));
+
+for(const frequency of ['weekly','fortnightly']){
+ const frequencyIds=await Promise.all(['100.03','200.07'].map(x=>create(x,{external_ref:frequency+'-'+x})));
+ const fq=await joint('quote',{ids:frequencyIds});
+ const fp={ids:frequencyIds,discount_percent:'0',down_payment:'10.01',installments:'5',first_due_date:'2028-02-23',reason:'Teste de periodicidade',expected_snapshot:fq.snapshot,payment_frequency:frequency};
+ await assert.rejects(()=>joint('formalize',{...fp,payment_frequency:'invalid'}),/Periodicidade/);
+ const fs=simulateNegotiation(fq,fp,100),fr=await joint('formalize',fp);
+ assert.equal(fr.payment_frequency,frequency);
+ assert.deepEqual(fr.schedule.map(x=>x.due_date),fs.schedule.map(x=>x.due_date));
+ assert.deepEqual(fr.schedule.map(x=>Number(x.amount)),fs.schedule.map(x=>Number(x.amount)));
+ for(const id of frequencyIds){const detail=await rpc('detail',{id});assert.equal(detail.process.metadata.agreement_payment_frequency,frequency);assert.match(detail.agreements[0].notes,new RegExp(frequency));for(const row of detail.installments)assert.equal(row.due_date,fs.schedule.find(x=>x.number===row.installment_number).due_date);}
+}
+console.log('PASS semanal e quinzenal: simulação, datas gravadas, auditoria, centavos e rejeição de frequência inválida');
 await db.exec('reset role;set role anon');await assert.rejects(()=>joint('quote',{ids}));console.log('PASS percentuais: juros, multa, honorários, alçada combinada, contrato preservado e acordo com valores recalculados; proposta conjunta: seleção completa, centavos, rateio e parcelas consolidadas, calendário, saldo conferido sob bloqueio, duplicação e isolamento; nenhum recebimento fictício');await db.close();

@@ -11,8 +11,13 @@ async function call(c,path,body,fetcher=fetch){
  const data=await r.json().catch(()=>null);if(!r.ok)throw Error('Evolution rejeitou a solicitação. Verifique a conexão no painel.');return data;
 }
 export async function connectionStatus(c,fetcher=fetch){if(!c)return {ready:false,state:'not_configured'};const data=await call(c,'/instance/connectionState',null,fetcher);return {ready:data?.instance?.state==='open',state:data?.instance?.state||'disconnected'};}
+export function validateWhatsappNumber(value){
+ const number=String(value||'').replace(/\D/g,'');
+ if(!/^[1-9][0-9]{11,14}$/.test(number))throw Error('Telefone incompleto. Cadastre o destinatário com código do país, DDD e número completo. Nenhuma mensagem foi enviada.');
+ return number;
+}
 export async function sendEvolution(c,message,fetcher=fetch){
- const number=String(message.phone||'').replace(/\D/g,'');if(!/^[1-9][0-9]{11,14}$/.test(number))throw Error('Cadastre o telefone com código do país e DDD, por exemplo 55 + DDD + número.');
+ const number=validateWhatsappNumber(message.phone);
  const a=message.attachment;let endpoint,body;
  if(a){endpoint='/message/sendMedia';body={number,mediatype:a.mime.startsWith('image/')?'image':a.mime.startsWith('audio/')?'audio':'document',mimetype:a.mime,fileName:a.name,caption:message.content||'',media:a.base64.replace(/\s/g,'')};}
  else{endpoint='/message/sendText';body={number,text:message.content,linkPreview:false};}
