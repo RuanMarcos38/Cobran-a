@@ -40,3 +40,5 @@ jobs:
       - run: node tests/mail-trash.local.mjs
 
       - run: node tests/financial-calendar.local.mjs
+
+      - run: node tests/process-tabs.local.mjs
