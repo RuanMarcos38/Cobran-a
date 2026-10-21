@@ -1,3 +1,4 @@
+import {handleMailMutation,verifyMailContact} from './mail-trash.mjs';
 import {readMailboxes,imapMessageLocation} from './mail-imap.mjs';
 import {randomUUID} from 'node:crypto';
 import nodemailer from 'nodemailer';
@@ -86,9 +87,10 @@ export async function handleAttendance(operation,body,rpc,env=process.env){
   const q=await evolution(cfg,'/instance/connect/'+encodeURIComponent(cfg.instance));
   if(typeof q.base64!=='string'||q.base64.length>1500000||!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(q.base64))throw publicError('QR Code indisponível. Verifique se o número já está conectado.');return {base64:q.base64};
  }
+ if(operation==='attend_mail_mutation'){try{return await handleMailMutation(body,account,cfg,rpc,imapClient);}catch(e){throw publicError(e.message);}}
  if(operation==='attend_sync'){
   const messages=account.channel==='email'?await readInbox(cfg):evolutionMessages(await evolution(cfg,'/chat/findMessages/'+encodeURIComponent(cfg.instance),{where:{},page:1,offset:100}));
-  for(let i=0;i<messages.length;i+=5)await rpc('attend','sync',{account_id:account.id,messages:messages.slice(i,i+5)});
+  for(let i=0;i<messages.length;i+=5)await rpc('attend',account.channel==='email'?'mail_sync':'sync',{account_id:account.id,messages:messages.slice(i,i+5)});
   return {synced:messages.length};
  }
  if(operation==='attend_attachment'){
@@ -107,7 +109,7 @@ export async function handleAttendance(operation,body,rpc,env=process.env){
    await client.connect();const lock=await client.getMailboxLock(location.path,{readOnly:true});try{
     if(String(client.mailbox.uidValidity)!==location.validity)throw publicError('Caixa postal alterada. Sincronize novamente.');
     const item=await client.fetchOne(location.uid,{source:true,size:true},{uid:true});if(!item||item.size>5242880||item.source.length>5242880)throw publicError('E-mail ausente ou maior que 5 MB.');
-    const parsed=await simpleParser(item.source);const attachment=parsed.attachments[Number(body.index)];if(!attachment||attachment.size>5242880)throw publicError('Anexo indisponível.');
+    const parsed=await simpleParser(item.source);verifyMailContact({from:parsed.from?.value,to:parsed.to?.value,cc:parsed.cc?.value},cfg.address,detail.thread.address);const attachment=parsed.attachments[Number(body.index)];if(!attachment||attachment.size>5242880)throw publicError('Anexo indisponível.');
     return {name:attachment.filename||'anexo',mime:attachment.contentType,base64:attachment.content.toString('base64')};
    }finally{lock.release();}
   }finally{await client.logout().catch(()=>{});}
