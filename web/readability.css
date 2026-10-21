@@ -70,7 +70,7 @@ dialog[open]:has(>form){display:flex;flex-direction:column;overflow:hidden;paddi
 dialog[open]>form{display:flex;flex-direction:column;min-width:0;min-height:0;max-height:inherit;overflow:hidden;margin:0;width:100%}
 dialog[open]>form>.modal-head,dialog[open]>form>.modal-actions{position:relative;inset:auto;flex:0 0 auto;z-index:2;margin:0}
 dialog[open]>form>.form-grid{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;scroll-padding-block:16px}
-dialog.window-maximized[open]{max-width:100%;max-height:100dvh}
+dialog.window-maximized[open]{width:100%;height:100dvh;max-width:100%;max-height:100dvh}
 dialog.window-maximized[open]>form{height:100%;max-height:100%}
 .negotiation-dialog .negotiation-ledger{margin:16px 0 20px}
 .negotiation-dialog .negotiation-ledger-scroll{max-height:none;overflow-x:auto}
@@ -86,5 +86,5 @@ dialog.window-maximized[open]>form{height:100%;max-height:100%}
 :where(button,a,input,select,textarea,summary,[tabindex]):focus-visible{outline:2px solid var(--primary,#0078d4);outline-offset:3px}
 .panel,.workspace,.detail-grid,.metrics,.form-grid,.filters{min-width:0}
 @media(min-width:601px) and (max-width:1100px){.negotiation-dialog .negotiation-balances{grid-template-columns:repeat(3,minmax(0,1fr))}.negotiation-dialog .negotiation-balances:not(:has(>div:nth-child(5))){grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:600px){dialog[open]:has(>form){max-width:calc(100vw - 12px);max-height:calc(100dvh - 12px)}dialog.window-maximized[open]{max-width:100%;max-height:100dvh}.negotiation-dialog .negotiation-balances,.negotiation-dialog .negotiation-balances:not(:has(>div:nth-child(5))){grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.negotiation-dialog .negotiation-balances>div{padding:10px;min-height:72px}.negotiation-dialog .negotiation-balances strong{font-size:18px}.negotiation-ledger-tools{gap:8px}.modal-head h2{min-width:0;overflow-wrap:anywhere}.negotiation-dialog .negotiation>header h3{font-size:15px}.modal-actions{justify-content:flex-end}.modal-actions button{max-width:100%}}
+@media(max-width:600px){dialog[open]:has(>form){max-width:calc(100vw - 12px);max-height:calc(100dvh - 12px)}dialog.window-maximized[open]{width:100%;height:100dvh;max-width:100%;max-height:100dvh}.negotiation-dialog .negotiation-balances,.negotiation-dialog .negotiation-balances:not(:has(>div:nth-child(5))){grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.negotiation-dialog .negotiation-balances>div{padding:10px;min-height:72px}.negotiation-dialog .negotiation-balances strong{font-size:18px}.negotiation-ledger-tools{gap:8px}.modal-head h2{min-width:0;overflow-wrap:anywhere}.negotiation-dialog .negotiation>header h3{font-size:15px}.modal-actions{justify-content:flex-end}.modal-actions button{max-width:100%}}
 @media print{dialog[open]:has(>form),dialog[open]>form,dialog[open]>form>.form-grid{display:block;height:auto;max-height:none;overflow:visible}.negotiation-dialog .negotiation-ledger-scroll{overflow:visible}}
