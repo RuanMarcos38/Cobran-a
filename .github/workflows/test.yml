@@ -34,3 +34,5 @@ jobs:
       - run: node tests/fee-age.local.mjs
 
       - run: node tests/negotiation-rates.local.mjs
+
+      - run: node tests/tenant-isolation.local.mjs
