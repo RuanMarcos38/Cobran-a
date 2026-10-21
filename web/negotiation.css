@@ -55,3 +55,6 @@ html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table tbody tr:nth
 html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table :is(th,tfoot td){background:#30465d;color:#dce7f2}
 html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table tbody td:last-child{color:#b9d9f8}
 @media(max-width:700px){.negotiation-dialog .negotiation-balances strong{font-size:17px}.negotiation-dialog .negotiation-balances>div{padding:12px}.negotiation-dialog .negotiation-section-head{align-items:flex-start;flex-direction:column}.negotiation-dialog .negotiation-ledger-table :is(th,td){height:46px}}
+
+/* Editable negotiation rates remain next to their monetary component. */
+.negotiation .negotiation-rate{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px;margin:9px 0 0;font-size:12px;font-weight:400}.negotiation-rate>span:first-child{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.negotiation-rate input{width:78px;min-height:34px;padding:6px 8px;text-align:right;box-sizing:border-box}.negotiation-ledger-table td:has(.negotiation-rate){min-width:125px;padding-top:14px;padding-bottom:14px}

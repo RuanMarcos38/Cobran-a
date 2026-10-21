@@ -19,3 +19,5 @@ test('invalid offers cannot exceed authorization or create zero-value installmen
  assert.throws(()=>simulateNegotiation({total:'0.01'},{...valid,installments:'2'},10));
  assert.equal(monthlyDueDate('2028-01-31',1),'2028-02-29');
 });
+
+test('negotiated charge reductions and additional discounts share the same approval limit',()=>{const p={discount_percent:'0',down_payment:'0',installments:'1',first_due_date:'2027-01-01'};assert.throws(()=>simulateNegotiation({total:'800',contract_total:'1000'},p,10),/alçada/);assert.equal(simulateNegotiation({total:'900',contract_total:'1000'},p,10).total,'900.00');assert.throws(()=>simulateNegotiation({total:'900',contract_total:'1000'},{...p,discount_percent:'1'},10),/alçada/);});
