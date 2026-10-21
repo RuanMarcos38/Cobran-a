@@ -1,16 +1,17 @@
 /* Email-only workspace. WhatsApp rules and application navigation are unaffected. */
-.attendance-separated.attendance-email{grid-template-columns:205px minmax(260px,31%) minmax(0,1fr);height:calc(100dvh - 210px);min-height:560px;font-family:'Segoe UI',Arial,sans-serif;border:1px solid #dce3ec;border-radius:7px;background:#fff}
+.attendance-separated.attendance-email{grid-template-columns:230px minmax(320px,34%) minmax(0,1fr);height:calc(100dvh - 210px);min-height:480px;font-family:'Segoe UI',Arial,sans-serif;border:1px solid #dce3ec;border-radius:7px;background:#fff}
 .attendance-email [hidden]{display:none!important}
-.attendance-email .mail-folders{gap:8px;padding:20px 14px;background:#f5f7fa;overflow:auto}
+.attendance-email .mail-folders{gap:12px;padding:24px 18px;background:#f5f7fa;overflow:auto;scrollbar-gutter:stable;box-sizing:border-box}
 .attendance-email .mail-folders h2{font-size:24px;color:#183957;letter-spacing:-.5px;margin:0 0 8px}
 .attendance-email .mail-folders h3{margin:20px 8px 3px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#637589}
 .attendance-email .mail-folders .mail-new{border-radius:5px;background:#0078d4;padding:11px 12px;box-shadow:0 1px 2px #14395718}
-.attendance-email .mail-folders label{font-size:11px;color:#52687e;margin-top:7px}
-.attendance-email .mail-folders select{font-size:11px;padding:9px 6px;background:#fff;border:1px solid #d5dfeb}
+.attendance-email .mail-folders label{font-size:12px;line-height:1.5;color:#52687e;margin-top:7px;min-width:0}
+.attendance-email .mail-folders select{font-size:12px;padding:10px 8px;min-height:42px;background:#fff;border:1px solid #d5dfeb;text-overflow:ellipsis}
 .attendance-email [data-mail-folder]{display:flex;align-items:center;justify-content:space-between;gap:8px;border-radius:5px;min-height:40px;padding:10px;color:#334a60;border-left:3px solid transparent}
 .attendance-email [data-mail-folder] small{font-size:11px;color:#687e91;min-width:20px;text-align:right}
 .attendance-email [data-mail-folder].active{background:#e1effb;border-left-color:#0078d4;color:#005a9e;font-weight:600}
 .mail-folder-bottom{margin-top:auto;padding-top:24px}.mail-folder-bottom p{line-height:1.6}.mail-folder-bottom summary{font-size:12px;cursor:pointer;padding:10px 0;color:#52687e}.mail-folder-bottom button{font-size:12px;width:100%}
+.attendance-email .mail-folder-bottom p{font-size:12px;line-height:1.8;margin:0 0 14px;overflow-wrap:anywhere}.attendance-email .mail-folder-bottom button{min-height:44px;padding:10px;text-align:left;line-height:1.5}.attendance-email [data-mail-folder]{min-height:44px;flex-shrink:0;font-size:14px;line-height:1.5}
 .attendance-email .attendance-list>header{padding:15px 16px;min-height:62px;box-sizing:border-box;border-bottom:0}
 .attendance-email .attendance-list h2{font-size:18px;font-weight:600;color:#203c55}
 .attendance-email .attendance-list>header>div{display:none}
@@ -19,10 +20,10 @@
 .attendance-email .attendance-filters button{font-size:11px;color:#47627a;border:0;border-radius:4px;padding:3px 6px;min-height:25px}
 .attendance-email .attendance-list>[role=status]{font-size:10px;line-height:1.5;margin:0 14px 10px;min-height:15px;color:#6d7e8f}
 .attendance-email [data-threads]{border-top:1px solid #e4e9f0}
-.attendance-email .mail-list-item{display:block;width:100%;text-align:left;padding:15px 17px 14px;border-bottom:1px solid #e8edf3;border-left:3px solid transparent;border-radius:0;color:#243b50;background:white}
+.attendance-email .mail-list-item{display:block;width:100%;box-sizing:border-box;min-width:0;text-align:left;padding:20px;border-bottom:1px solid #e8edf3;border-left:3px solid transparent;border-radius:0;color:#243b50;background:white}
 .attendance-email .mail-list-item:hover{background:#f5f9fd}.attendance-email .mail-list-item.active{background:#eaf3fc;border-left-color:#0078d4}
-.mail-list-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}.mail-list-top strong{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mail-list-top time{font-size:10px;color:#697f92;white-space:nowrap}
-.mail-list-subject,.mail-list-preview,.mail-list-address{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.mail-list-subject{font-size:12px;font-weight:600;margin-top:7px;line-height:1.5}.mail-list-preview{font-size:12px;color:#6d7d8d;line-height:1.5;margin-top:3px}.mail-list-address{font-size:10px;color:#798b9c;margin-top:8px}
+.mail-list-top{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:16px;line-height:1.5}.mail-list-top strong{min-width:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mail-list-top time{font-size:11px;color:#697f92;white-space:nowrap}
+.mail-list-subject,.mail-list-preview,.mail-list-address{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.mail-list-subject{font-size:13px;font-weight:600;margin-top:9px;line-height:1.6}.mail-list-preview{font-size:13px;color:#6d7d8d;line-height:1.6;margin-top:6px}.mail-list-address{font-size:11px;color:#62778a;margin-top:12px;line-height:1.6}
 .attendance-email .attendance-pane{background:#fafbfd;min-width:0}
 .attendance-email .attendance-welcome{background:#fafbfd;color:#687f92}.attendance-email .attendance-welcome h2{font-size:23px;color:#34516b}.attendance-email .attendance-welcome .attendance-icon{width:70px;height:70px;color:#77a9d1}
 .attendance-email .attendance-header{padding:12px 18px;min-height:65px;flex-wrap:wrap;gap:8px;background:#fff;border-bottom:1px solid #e4eaf1}
@@ -41,6 +42,6 @@
 .attendance-email .attendance-compose-actions{flex-wrap:wrap;gap:10px}.attendance-email .attendance-send{border-radius:4px;padding:8px 18px;background:#0078d4;font-size:12px}.attendance-email .collection-script-picker{display:flex;flex-wrap:wrap;align-items:end;gap:10px;padding-bottom:12px;font-size:11px}.attendance-email .collection-script-picker small{display:none}.attendance-email .collection-script-picker button{border:1px solid #dce5ee;border-radius:4px;padding:5px 8px;font-size:11px}
 .mail-mobile-folder,.mail-mobile-new{display:none}.attendance-email [data-mail-back]{display:none}
 .attendance-email .mail-compose-mode .attendance-messages,.attendance-email .mail-compose-mode [data-mail-reply]{display:none}.attendance-email .mail-compose-mode .attendance-composer{max-height:none;flex:1}.attendance-email .mail-compose-mode .attendance-composer textarea{height:220px;max-height:none}
-@media(max-width:1100px){.attendance-separated.attendance-email{grid-template-columns:175px minmax(240px,31%) minmax(0,1fr)}.attendance-email .mail-folders{padding:16px 10px}.attendance-email .mail-item{padding:20px}.attendance-email .attendance-header [data-assign]{display:none}}
-@media(max-width:850px){.attendance-separated.attendance-email{grid-template-columns:minmax(240px,38%) minmax(0,1fr)}.attendance-email .mail-folders{display:none}.attendance-email .attendance-list>header>div{display:flex}.attendance-email .attendance-account{display:block;padding:4px 14px 8px}.attendance-email .mail-mobile-folder,.attendance-email .mail-mobile-new{display:block;margin:3px 14px 8px;width:calc(100% - 28px)}.attendance-email .mail-mobile-new{background:#0078d4;color:white;border-radius:4px;padding:7px;min-height:32px;font-size:12px}.attendance-email .attendance-account>span{display:none}}
+@media(max-width:1100px){.attendance-email .mail-item{padding:20px}.attendance-email .attendance-header [data-assign]{display:none}}
+@media(max-width:1050px){.attendance-separated.attendance-email{grid-template-columns:minmax(280px,42%) minmax(0,1fr)}.attendance-email .mail-folders{display:none}.attendance-email .attendance-list>header>div{display:flex}.attendance-email .attendance-account{display:block;padding:4px 14px 8px}.attendance-email .mail-mobile-folder,.attendance-email .mail-mobile-new{display:block;margin:3px 14px 8px;width:calc(100% - 28px)}.attendance-email .mail-mobile-new{background:#0078d4;color:white;border-radius:4px;padding:7px;min-height:32px;font-size:12px}.attendance-email .attendance-account>span{display:none}}
 @media(max-width:650px){.attendance-separated.attendance-email{display:block;height:calc(100dvh - 180px);min-height:520px}.attendance-email .attendance-list{width:100%;height:100%;max-height:none;border-right:0}.attendance-email .attendance-pane{display:none;height:100%;width:100%;border:0}.attendance-email.mail-reading .attendance-list{display:none}.attendance-email.mail-reading .attendance-pane{display:flex}.attendance-email [data-mail-back]{display:inline-block}.attendance-email .mail-item{padding:18px}.attendance-email .mail-item>header strong{font-size:18px}.attendance-email .attendance-composer{padding:12px;max-height:65%}.attendance-email .attendance-mail-body{height:380px}}
