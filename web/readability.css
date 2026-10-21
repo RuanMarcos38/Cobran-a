@@ -5,7 +5,7 @@ button,input,select,textarea{line-height:1.4}
 .app-main{font-size:14px;line-height:1.5}.workspace{min-width:0;margin-bottom:80px}
 .page-heading{padding:24px 24px 18px}.page-heading h1{line-height:1.25;margin:10px 0 8px}.page-heading p{font-size:14px;line-height:1.6}
 .sidebar .nav .nav-group-toggle,.sidebar .nav [data-section]{font-size:13px;line-height:1.5;min-height:44px}
-.sidebar-brand small{font-size:11px;line-height:1.5}
+.sidebar-brand{height:auto;min-height:84px;padding:18px 16px;align-content:center;grid-template-rows:auto auto}.sidebar-brand strong{line-height:1.2}.sidebar-brand small{grid-column:2;font-size:11px;line-height:1.4}
 .topbar{gap:12px}.topbar button{flex-shrink:0;line-height:1.4}.topbar #global-search{min-width:120px}
 #content>.toolbar,.panel>.toolbar{gap:12px;padding:16px;align-items:center}
 #content>.toolbar button,.panel>.toolbar button{font-size:13px;min-height:40px;padding:9px 13px;line-height:1.4;white-space:normal}
