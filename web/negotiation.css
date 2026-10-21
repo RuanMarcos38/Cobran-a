@@ -58,3 +58,5 @@ html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table tbody td:las
 
 /* Editable negotiation rates remain next to their monetary component. */
 .negotiation .negotiation-rate{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px;margin:9px 0 0;font-size:12px;font-weight:400}.negotiation-rate>span:first-child{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.negotiation-rate input{width:78px;min-height:34px;padding:6px 8px;text-align:right;box-sizing:border-box}.negotiation-ledger-table td:has(.negotiation-rate){min-width:125px;padding-top:14px;padding-bottom:14px}
+
+.negotiation-inputs{grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))}.negotiation-inputs select{width:100%;min-width:0}

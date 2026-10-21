@@ -32,3 +32,12 @@ test('collection variants identify debtor, keep proposal conditions and require 
  const message=collectionScript('proposal',{...detail,quote,simulation});assert.match(message.content,/Honorários: R\$/);assert.match(message.content,/seu aceite/);
  assert.throws(()=>collectionScript('proposal',detail));assert.throws(()=>collectionScript('statement',{debtor:{}}));assert.throws(()=>collectionScript('invalid',{...detail,quote,simulation}));
 });
+
+test('PDF and Excel identify the selected installment frequency',()=>{
+ for(const [frequency,label] of [['weekly','7 dias'],['fortnightly','15 dias']]){
+ const rows=proposalRows(detail,quote,{...simulation,payment_frequency:frequency});
+ assert.match(rows.find(r=>r[0]==='Periodicidade das parcelas')[1],new RegExp(label));
+ assert.ok(new TextDecoder('latin1').decode(proposalPdf(rows)).includes(label));
+ assert.ok(new TextDecoder().decode(proposalXlsx(rows)).includes(label));
+ }
+});
