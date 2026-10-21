@@ -18,10 +18,10 @@ export function installDatePickers(root=document){
   text.addEventListener('input',()=>{try{const date=parseBrazilianDate(text.value);set(date);}catch(e){text.dataset.calendarError=e.message;text.setCustomValidity(e.message);}});
   text.addEventListener('blur',()=>{if(text.validity.valid)sync();});time?.addEventListener('change',()=>{try{set(parseBrazilianDate(text.value));}catch(e){text.setCustomValidity(e.message);}});
   input.addEventListener('calendar-sync',sync);input.addEventListener('input',sync);input.addEventListener('invalid',e=>{e.preventDefault();text.focus();text.setCustomValidity(input.validationMessage);text.reportValidity();});
-  const open=()=>{
+  const open=(focusDays=true)=>{
    if(!input.isConnected)return;active?.close();const panel=document.createElement('div');panel.className='financial-datepicker';panel.setAttribute('popover','auto');panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Calendário');(input.closest('dialog')||document.body).append(panel);
    let focused=input.value.slice(0,10)||today(),view;try{dateParts(focused);}catch{focused=today();}view=focused.slice(0,7)+'-01';
-   const close=()=>{if(panel.matches(':popover-open'))panel.hidePopover();panel.remove();button.setAttribute('aria-expanded','false');if(active?.panel===panel)active=null;};active={panel,close};
+   const close=()=>{if(panel.matches(':popover-open'))panel.hidePopover();panel.remove();button.setAttribute('aria-expanded','false');if(active?.panel===panel)active=null;};active={panel,close,input};
    const allowed=date=>(!input.min||date>=input.min.slice(0,10))&&(!input.max||date<=input.max.slice(0,10));
    const select=date=>{if(!allowed(date))return;close();text.value=displayDate(date);set(date);if(text.isConnected)text.focus();};
    function position(){const r=wrap.getBoundingClientRect(),w=Math.min(296,innerWidth-16),h=panel.getBoundingClientRect().height;panel.style.width=w+'px';panel.style.left=Math.max(8,Math.min(r.left,innerWidth-w-8))+'px';panel.style.top=Math.max(8,r.bottom+h+8<innerHeight?r.bottom+4:r.top-h-4)+'px';}
@@ -34,9 +34,9 @@ export function installDatePickers(root=document){
    }
    function move(n){try{view=monthlyDueDate(view,n);focused=view;draw(true);}catch{}}
    panel.addEventListener('keydown',e=>{if(e.key==='Escape'){close();button.focus();return;}if(!e.target.dataset.date)return;let delta={ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7}[e.key];if(e.key==='PageUp'||e.key==='PageDown'){e.preventDefault();move((e.key==='PageUp'?-1:1)*(e.shiftKey?12:1));return;}if(e.key==='Home'||e.key==='End'){delta=e.key==='Home'?1-Number(e.target.dataset.date.slice(-2)):new Date(Date.UTC(...(()=>{const [y,m]=dateParts(view);return [y,m,0];})())).getUTCDate()-Number(e.target.dataset.date.slice(-2));}if(delta===undefined)return;e.preventDefault();const [y,m,d]=dateParts(e.target.dataset.date),next=isoDate(new Date(Date.UTC(y,m-1,d+delta)));try{dateParts(next);}catch{return;}focused=next;view=next.slice(0,7)+'-01';draw(true);});
-   panel.addEventListener('toggle',e=>{if(e.newState==='closed'){panel.remove();button.setAttribute('aria-expanded','false');if(active?.panel===panel)active=null;}});draw();panel.showPopover();button.setAttribute('aria-expanded','true');position();panel.querySelector('[data-date="'+focused+'"]')?.focus();
+   panel.addEventListener('toggle',e=>{if(e.newState==='closed'){panel.remove();button.setAttribute('aria-expanded','false');if(active?.panel===panel)active=null;}});draw();panel.showPopover();button.setAttribute('aria-expanded','true');position();if(focusDays)panel.querySelector('[data-date="'+focused+'"]')?.focus();
   };
-  input.addEventListener('calendar-open',open);button.onclick=open;text.addEventListener('click',open);text.addEventListener('keydown',e=>{if(e.key==='ArrowDown'&&e.altKey){e.preventDefault();open();}});
+  input.addEventListener('calendar-open',()=>open(true));button.onclick=()=>open(true);text.addEventListener('click',()=>open(false));text.addEventListener('keydown',e=>{if(e.key==='ArrowDown'&&e.altKey){e.preventDefault();open();}});
  }
  const scan=()=>{if(active&&!active.panel.isConnected)active.close();root.querySelectorAll('input[type="date"],input[type="datetime-local"]').forEach(enhance);};scan();if(!installed){installed=true;new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});window.addEventListener('resize',()=>active?.close());document.addEventListener('scroll',e=>{if(active&&!active.panel.contains(e.target))active.close();},true);}return scan;
 }
