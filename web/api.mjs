@@ -30,5 +30,6 @@ export async function improve(action,payload={}){await rpc('profile');return req
 export async function changePassword(password){await rpc('profile');return request('/auth/v1/user',{method:'PUT',body:JSON.stringify({password})});}
 
 export async function attendance(action,payload={}){await rpc('profile');return request('/rest/v1/rpc/cobranca_attendance',{method:'POST',body:JSON.stringify({action,payload})});}
+export async function prospect(action,payload={}){await rpc('profile');return request('/rest/v1/rpc/cobranca_prospect',{method:'POST',body:JSON.stringify({action,payload})});}
 
 export async function negotiate(action,payload={}){await rpc('profile');return request('/rest/v1/rpc/cobranca_negotiate',{method:'POST',body:JSON.stringify({action,payload})});}
