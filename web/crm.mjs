@@ -1,4 +1,5 @@
 import {renderCommercialBoard} from './commercial-board.mjs';
+import {renderProspection,stopProspectRefresh} from './prospection.mjs';
 import {renderAttendance} from './attendance.mjs';
 import {renderScheduleConnection,localDateTime,schedulePayload,scheduleAutoRefresh,stopScheduleRefresh} from './scheduling.mjs';
 import {brl} from './money.mjs';
@@ -9,7 +10,14 @@ const choose=(name,label,options,value)=>`<label>${esc(label)}<select name="${na
 const table=(rows,cols)=>`<div class=table-wrap><table><thead><tr>${cols.map(([k,l])=>`<th>${esc(l)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(([k])=>`<td>${esc(['amount','base_amount'].includes(k)?brl(r[k]):r[k])}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${cols.length}">Nenhum registro encontrado.</td></tr>`}</tbody></table></div>`;
 export async function renderSector(section,{api,modal,guard,notify,navigate},target){
  stopScheduleRefresh();
- if(['Prospecção','Funil / Kanban'].includes(section))return renderCommercialBoard({api,modal,guard,notify,navigate},target);
+ stopProspectRefresh();
+ if(section==='Prospecção'){
+  target.innerHTML='<div class="prospect-view-switch"><button data-prospect-view="dashboard" aria-pressed="true">Leads e envios</button><button data-prospect-view="board" aria-pressed="false">Oportunidades comerciais</button></div><div data-prospect-content></div>';
+  const content=target.querySelector('[data-prospect-content]');
+  const select=async view=>{stopProspectRefresh();target.querySelectorAll('[data-prospect-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.prospectView===view)));return view==='board'?renderCommercialBoard({api,modal,guard,notify,navigate},content):renderProspection({api,modal,guard,notify},content);};
+  target.querySelectorAll('[data-prospect-view]').forEach(b=>b.addEventListener('click',()=>guard(()=>select(b.dataset.prospectView))));return select('dashboard');
+ }
+ if(section==='Funil / Kanban')return renderCommercialBoard({api,modal,guard,notify,navigate},target);
  if(section==='Integração n8n')return renderScheduleConnection({api,modal,guard,notify},target);
  const again=()=>renderSector(section,{api,modal,guard,notify,navigate},target);
  const btn=(id,label)=>`<button data-sector="${id}">${esc(label)}</button>`;
