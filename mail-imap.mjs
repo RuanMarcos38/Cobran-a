@@ -14,12 +14,12 @@ export function imapMessageLocation(message){
  if(!path||path.length>200||/[\x00-\x1f]/.test(path))throw Error('Pasta de e-mail inválida.');
  return {path,validity:sent[2],uid:sent[3]};
 }
-export async function readMailboxes(config,createImap,sanitize){
+export async function readMailboxes(config,createImap,sanitize,{inboxOnly=false}={}){
  const client=createImap(config),messages=[];
  try{
   await client.connect();
   const folders=client.list?await client.list():[],sent=sentMailbox(folders),trash=trashMailbox(folders);
-  for(const path of [...new Set(['INBOX',...(sent?[sent]:[]),...(trash?[trash]:[])])]){
+  for(const path of inboxOnly?['INBOX']:[...new Set(['INBOX',...(sent?[sent]:[]),...(trash?[trash]:[])])]){
    const isTrash=path===trash,lock=await client.getMailboxLock(path,{readOnly:true});
    try{
     const count=client.mailbox.exists;if(!count)continue;
@@ -30,7 +30,9 @@ export async function readMailboxes(config,createImap,sanitize){
      const contact=(outgoing?parsed.to:parsed.from)?.value?.[0];if(!contact?.address)continue;
      const locator=isTrash?'imap-mailbox:'+Buffer.from(path).toString('base64url')+':'+client.mailbox.uidValidity+':'+item.uid:outgoing?'imap-sent:'+Buffer.from(path).toString('base64url')+':'+client.mailbox.uidValidity+':'+item.uid:'imap:'+client.mailbox.uidValidity+':'+item.uid;
      const messageId=typeof parsed.messageId==='string'&&parsed.messageId.length<=500?parsed.messageId:null;
-     messages.push({mail_location:{path,validity:String(client.mailbox.uidValidity),uid:String(item.uid)},mail_message_id:messageId,mail_trashed:isTrash,provider_id:outgoing?(messageId||locator):locator,provider_ref:outgoing?locator:messageId,address:contact.address.toLowerCase(),name:contact.name||contact.address,subject:String(parsed.subject||'Sem assunto').slice(0,250),content:String(parsed.text||'[E-mail sem texto disponível]').slice(0,100000),html:sanitize(parsed.html),created_at:parsed.date?.toISOString()||new Date().toISOString(),attachments:(parsed.attachments||[]).slice(0,20).map((a,index)=>({index,name:a.filename||'anexo',mime:a.contentType,size:a.size})),from_me:outgoing});
+     const references=(Array.isArray(parsed.references)?parsed.references:[parsed.references]).filter(x=>typeof x==='string'&&x.length<=500).slice(0,30);
+     const replyData={in_reply_to:typeof parsed.inReplyTo==='string'?parsed.inReplyTo.slice(0,500):null,references,auto_submitted:parsed.headers.has('auto-submitted')&&parsed.headers.get('auto-submitted')!=='no'};
+     messages.push({...replyData,mail_location:{path,validity:String(client.mailbox.uidValidity),uid:String(item.uid)},mail_message_id:messageId,mail_trashed:isTrash,provider_id:outgoing?(messageId||locator):locator,provider_ref:outgoing?locator:messageId,address:contact.address.toLowerCase(),name:contact.name||contact.address,subject:String(parsed.subject||'Sem assunto').slice(0,250),content:String(parsed.text||'[E-mail sem texto disponível]').slice(0,100000),html:sanitize(parsed.html),created_at:parsed.date?.toISOString()||new Date().toISOString(),attachments:(parsed.attachments||[]).slice(0,20).map((a,index)=>({index,name:a.filename||'anexo',mime:a.contentType,size:a.size})),from_me:outgoing});
     }
    }finally{lock.release();}
   }

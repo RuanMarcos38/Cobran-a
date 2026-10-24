@@ -36,7 +36,7 @@ export function evolutionMessages(data){
   return {provider_id:x.key.id,provider_ref:x.key.remoteJid,address:x.phoneJid.split('@')[0],name:(x.key.fromMe!==true&&validContactName(x.pushName))||x.phoneJid.split('@')[0],content:String(x.message?.conversation||x.message?.extendedTextMessage?.text||media?.caption||(media?'[Anexo recebido]':'[Mensagem não textual]')).slice(0,100000),attachments:media?[{index:0,name:media.fileName||(x.message.audioMessage?'audio.ogg':'anexo'),mime:media.mimetype||'application/octet-stream',size:Number(media.fileLength)||0,remote:true}]:[],created_at:new Date(Number(x.messageTimestamp)*1000||Date.now()).toISOString(),from_me:x.key.fromMe===true};
  });
 }
-export async function readInbox(c,createImap=imapClient){return readMailboxes(c,createImap,safeEmailHtml);}
+export async function readInbox(c,createImap=imapClient,options={}){return readMailboxes(c,createImap,safeEmailHtml,options);}
 export async function handleAttendance(operation,body,rpc,env=process.env){
  const profile=await rpc('app','profile',{});
  const aad=id=>profile.tenant_id+':attendance:'+id;
