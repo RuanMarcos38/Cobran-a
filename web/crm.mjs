@@ -14,7 +14,7 @@ export async function renderSector(section,{api,modal,guard,notify,navigate},tar
  if(section==='Prospecção'){
   target.innerHTML='<div class="prospect-view-switch"><button data-prospect-view="dashboard" aria-pressed="true">Leads e envios</button><button data-prospect-view="board" aria-pressed="false">Oportunidades comerciais</button></div><div data-prospect-content></div>';
   const content=target.querySelector('[data-prospect-content]');
-  const select=async view=>{stopProspectRefresh();target.querySelectorAll('[data-prospect-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.prospectView===view)));return view==='board'?renderCommercialBoard({api,modal,guard,notify,navigate},content):renderProspection({api,modal,guard,notify},content);};
+  const select=async view=>{stopProspectRefresh();target.querySelectorAll('[data-prospect-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.prospectView===view)));return view==='board'?renderCommercialBoard({api,modal,guard,notify,navigate},content):renderProspection({api,modal,guard,notify,navigate},content);};
   target.querySelectorAll('[data-prospect-view]').forEach(b=>b.addEventListener('click',()=>guard(()=>select(b.dataset.prospectView))));return select('dashboard');
  }
  if(section==='Funil / Kanban')return renderCommercialBoard({api,modal,guard,notify,navigate},target);
