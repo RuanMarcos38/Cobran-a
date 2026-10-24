@@ -2,8 +2,9 @@ import {companyForm,companyAutocomplete,setCompanyDraft} from './company.mjs';
 export const stages=['Prospecção','Contato','Proposta','Negociação','Ganho','Perdido'];
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const choose=(key,label,rows,value)=>`<label>${label}<select name="${key}">${rows.map(r=>`<option value="${esc(r.id)}" ${r.id===value?'selected':''}>${esc(r.name)}</option>`).join('')}</select></label>`;
-let selectedPipeline;
+let selectedPipeline,boardRefresh;
 export async function renderCommercialBoard({api,modal,guard,notify,navigate},target){
+ clearInterval(boardRefresh);
  const data=await api.improve('crm_board');if(!data.pipelines.some(x=>x.id===selectedPipeline))selectedPipeline=data.pipelines[0]?.id;
  const rows=data.rows.filter(o=>(o.pipeline_id||data.pipelines[0]?.id)===selectedPipeline);
  const again=()=>renderCommercialBoard({api,modal,guard,notify,navigate},target);
@@ -28,4 +29,5 @@ export async function renderCommercialBoard({api,modal,guard,notify,navigate},ta
  let dragged;
  target.querySelectorAll('[data-opportunity]').forEach(card=>{card.ondragstart=e=>{if(e.target.closest('button,input,select,textarea,a,summary')){e.preventDefault();return;}dragged=card.dataset.opportunity;e.dataTransfer.setData('text/x-cobranca-opportunity',dragged);e.dataTransfer.effectAllowed='move';card.classList.add('dragging');};card.ondragend=()=>{dragged=null;card.classList.remove('dragging');target.querySelectorAll('.drop-target').forEach(x=>x.classList.remove('drop-target'));};});
  target.querySelectorAll('[data-stage]').forEach(column=>{column.ondragover=e=>{if(dragged){e.preventDefault();e.dataTransfer.dropEffect='move';column.classList.add('drop-target');}};column.ondragleave=()=>column.classList.remove('drop-target');column.ondrop=e=>{e.preventDefault();column.classList.remove('drop-target');const o=rows.find(o=>o.id===dragged);if(o)guard(async()=>move(o,column.dataset.stage));};});
+ boardRefresh=setInterval(()=>{if(!target.isConnected||!target.querySelector('.commercial-board'))return clearInterval(boardRefresh);if(!document.hidden&&!dragged&&!document.querySelector('dialog[open]')&&!target.querySelector('input:focus,select:focus,details[open]'))guard(again);},15000);
 }
