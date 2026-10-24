@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import {decrypt} from './email.mjs';
 import {validateMailConfig} from './attendance.mjs';
+import {institutionalMailbox,loadInstitutionalAttachment} from './prospection-assets.mjs';
 const transport=c=>nodemailer.createTransport({host:c.smtpHost,port:465,secure:true,auth:{user:c.address,pass:c.password},tls:{minVersion:'TLSv1.2',rejectUnauthorized:true},logger:false,debug:false,connectionTimeout:15000,socketTimeout:30000});
 // Preflight precedes the durable claim; after claiming, every failure is uncertain.
 export async function dispatchProspect(rpc,env=process.env,{createTransport=transport,decode=decrypt}={}){
@@ -9,14 +10,15 @@ export async function dispatchProspect(rpc,env=process.env,{createTransport=tran
  if(cfg.address!==account.address)throw Error('Conta comercial inconsistente');
  const smtp=createTransport(cfg);
  try{
+  const institutional=cfg.address===institutionalMailbox?await loadInstitutionalAttachment():null;
   await smtp.verify();
   const {lead,reason}=await rpc({operation:'claim'});
   if(!lead)return {status:'idle',reason};
   try{
    if(!/^[^\s@<>;,]+@[^\s@<>;,]+\.[^\s@<>;,]+$/.test(lead.email)||/[\r\n]/.test(lead.assunto))throw Error('Contato inválido');
-   const result=await smtp.sendMail({from:cfg.address,replyTo:cfg.address,to:lead.email,subject:lead.assunto,text:lead.mensagem,messageId:'<prospect-'+lead.attempt_id+'@'+cfg.address.split('@')[1]+'>'});
+   const result=await smtp.sendMail({from:cfg.address,replyTo:cfg.address,to:lead.email,subject:lead.assunto,text:lead.mensagem,messageId:'<prospect-'+lead.attempt_id+'@'+cfg.address.split('@')[1]+'>',attachments:institutional?[{filename:institutional.name,content:institutional.content,contentType:institutional.mime}]:[]});
    if(!result.accepted?.some(x=>String(x).toLowerCase()===lead.email.toLowerCase())||result.rejected?.length||!result.messageId)throw Error('SMTP não confirmou o destinatário');
-   await rpc({operation:'finish',attempt_id:lead.attempt_id,status:'accepted',provider_id:result.messageId});
+   await rpc({operation:'finish',attempt_id:lead.attempt_id,status:'accepted',provider_id:result.messageId,...(institutional?{attachments:[{...institutional,content:undefined}]}:{})});
    return {status:'accepted',id:lead.id,email:lead.email,attempt_id:lead.attempt_id,provider_id:result.messageId};
   }catch{
    await rpc({operation:'finish',attempt_id:lead.attempt_id,status:'unknown'}).catch(()=>{});

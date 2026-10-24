@@ -4,6 +4,8 @@ ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
 COPY --chown=node:node attendance.mjs mail-imap.mjs mail-trash.mjs server.mjs api-http.mjs prospection-mail.mjs prospection-automation.mjs evolution.mjs email.mjs whatsapp.mjs booking.mjs bank.mjs bordero-csv.mjs openapi.json ./
+COPY --chown=node:node prospection-assets.mjs ./
+COPY --chown=node:node assets ./assets
 COPY --chown=node:node templates/email-cobranca.json ./templates/email-cobranca.json
 COPY --chown=node:node web ./web
 USER node
