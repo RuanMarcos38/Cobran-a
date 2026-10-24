@@ -85,4 +85,28 @@ assert.equal((await worker(reply)).duplicate,true);assert.equal((await board()).
 await worker({...reply,provider_id:'<optout-fixture>',classification:'optout',content:'Remova meu contato'});assert.equal((await board()).rows.length,1);
 await as(other);assert.equal((await panel('list',{view:'history'})).rows.length,0);await assert.rejects(()=>panel('detail',{id:lead.id}));
 await as(sales);await assert.rejects(()=>panel('automation',{enabled:true}));
+
+// A rolling budget includes manual sends once, and higher capacity requires recent provider evidence.
+await as(admin);await db.exec('reset role');
+const capacity=async()=>(await db.query('select cobranca_private.prospect_capacity($1) result',[tenant])).rows[0].result;
+assert.equal((await capacity()).daily_limit,20);
+await db.query('update cobranca_private.prospect_connections set daily_limit=90 where tenant_id=$1',[tenant]);
+assert.equal((await capacity()).daily_limit,20);
+await db.query("update cobranca_private.prospect_connections set provider_daily_limit=100,provider_limit_checked_at=now() where tenant_id=$1",[tenant]);
+assert.equal((await capacity()).daily_limit,90);
+await db.query("update cobranca_private.prospect_connections set provider_limit_checked_at=now()-interval '31 days' where tenant_id=$1",[tenant]);
+assert.equal((await capacity()).daily_limit,20);
+await db.query("update cobranca_private.prospect_connections set provider_limit_checked_at=now() where tenant_id=$1",[tenant]);
+const before=await capacity();
+const message=(await db.query("select * from cobranca_private.attendance_messages where provider_id='<mock@example.invalid>'")).rows[0];
+await db.query("insert into cobranca_private.attendance_messages(tenant_id,thread_id,direction,status,provider_id,content) values($1,$2,'outbound','accepted','<manual-budget@example.invalid>','Manual test')",[tenant,message.thread_id]);
+assert.equal((await capacity()).used,before.used+1);
+await db.query("update cobranca_private.attendance_messages set created_at=now()-interval '25 hours' where provider_id='<manual-budget@example.invalid>'");
+assert.equal((await capacity()).used,before.used);
+await db.query("update cobranca_private.prospect_attempts set claimed_at=now()-interval '16 minutes'");
+assert.equal((await capacity()).used,before.used); // Mail copy and the source row do not count twice.
+assert.ok(new Date((await capacity()).next_allowed_at).getTime()<=Date.now()+1000);
+await as(admin);const page=await panel('list');assert.equal(page.page_size,25);assert.equal(page.policy.daily_limit,90);
+console.log('PASS: rolling 24-hour capacity, proof-gated 90 limit, manual mailbox sends, evidence deduplication and no cooldown drift from completion.');
+
 await db.close();console.log('PASS: tenant/role isolation, mirror deduplication, sticky suppression, imported history, stale approvals, CNPJ, durable single claim, idempotent completion, SMTP evidence, rate interval, uncertain lock, stale sync and token rotation. No external email sent.');
