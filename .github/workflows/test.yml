@@ -1,0 +1,44 @@
+name: Testes locais
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --check web/company-bank.mjs && node --check bank.mjs && node --check web/finance.mjs && node --check web/app.mjs && node --check web/borderos.mjs && node --check web/portfolios.mjs && node --check bordero-csv.mjs && node --check api-http.mjs && node --check web/chat.mjs && node --check web/whatsapp-connection.mjs && node --check web/pricing.mjs && node --check evolution.mjs && node --check whatsapp.mjs
+      - run: node --check attendance.mjs && node --check web/attendance.mjs
+      - run: node --check web/negotiation.mjs
+      - run: npm test
+      - run: npm run test:db
+      - run: node tests/sectors.local.mjs
+      - run: node tests/finance.local.mjs
+      - run: node tests/pricing.local.mjs
+      - run: node tests/bordero-csv.local.mjs
+      - run: node tests/company-bank.local.mjs
+      - run: node tests/debt-batch.local.mjs
+      - run: node tests/attendance.local.mjs
+      - run: node tests/negotiation.local.mjs
+      - run: node tests/joint-negotiation.local.mjs
+      - run: node tests/scheduling.local.mjs
+      - run: node --check web/app.mjs && node --check server.mjs
+
+      - run: node tests/contract-calculation.local.mjs
+
+      - run: node tests/contract-periods.local.mjs
+
+      - run: node tests/fee-age.local.mjs
+
+      - run: node tests/negotiation-rates.local.mjs
+
+      - run: node tests/tenant-isolation.local.mjs
+
+      - run: node tests/mail-trash.local.mjs
+
+      - run: node tests/financial-calendar.local.mjs
+
+      - run: node tests/process-tabs.local.mjs

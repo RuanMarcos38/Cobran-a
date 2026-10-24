@@ -1,0 +1,62 @@
+.negotiation-dialog{width:min(1050px,96vw);max-height:94dvh}.form-grid>.negotiation{grid-column:1/-1;min-width:0}.negotiation header h3{margin:0 0 8px}.negotiation header p{color:var(--muted);margin:0 0 16px}.negotiation-balances{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}.negotiation-balances>div{border:1px solid var(--line,#dce4ee);background:var(--panel,#f3f7fb);border-radius:8px;padding:14px}.negotiation-balances small{display:block;color:var(--muted);margin-bottom:8px}.negotiation-balances strong{display:block;font-size:20px;color:var(--text);overflow-wrap:anywhere}.negotiation-inputs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.negotiation label{display:flex;flex-direction:column;gap:7px;margin:14px 0}.negotiation input,.negotiation textarea{width:100%;box-sizing:border-box}.negotiation textarea{min-height:80px}.negotiation .negotiation-confirm{display:flex;flex-direction:row;align-items:flex-start;padding:14px;background:var(--panel,#f3f7fb);border-radius:8px}.negotiation-confirm input{width:auto;margin-top:3px}.negotiation [data-negotiation-result] .table-wrap{max-height:260px;overflow:auto}.negotiate-row{white-space:nowrap;color:var(--primary,#1766b5);font-weight:600}.negotiation .error:empty{display:none}@media(max-width:700px){.negotiation-balances,.negotiation-inputs{grid-template-columns:repeat(2,minmax(0,1fr))}.negotiation-balances strong{font-size:17px}}
+
+.collection-more{position:relative}.collection-more summary{cursor:pointer;list-style:none;padding:10px 14px;border:1px solid #dce4ee;border-radius:5px;white-space:nowrap}.collection-more>div{position:absolute;right:0;top:100%;z-index:15;display:grid;gap:5px;min-width:235px;padding:10px;background:var(--panel,#fff);border:1px solid #dce4ee;box-shadow:0 8px 24px #15365b22;border-radius:6px}.selection-bar{display:flex;align-items:center;gap:14px;padding:6px 14px;font-size:12px;color:var(--muted)}.selection-bar button{padding:5px 8px;font-size:12px}.negotiation-titles{margin:10px 0}.negotiation-titles summary{cursor:pointer;color:#1766b5}.negotiation-titles table{width:100%}
+
+#filters:not(.filters-expanded)>:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(8)):not(:nth-child(13)):not(:nth-child(14)):not([data-action=toggle-filters]){display:none}#filters>[data-action=toggle-filters]{justify-self:start;background:transparent;color:#1766b5;border:0;padding:6px 0}
+
+.negotiation-balances:has(>div:nth-child(5)){grid-template-columns:repeat(5,minmax(0,1fr))}.proposal-actions summary,.collection-email summary{cursor:pointer;padding:10px;color:var(--primary,#1766b5)}.proposal-actions[open]{display:flex;flex-wrap:wrap;gap:8px}.collection-email{border:1px solid var(--line,#dce4ee);border-radius:6px;padding:8px 14px;margin:16px 0}.collection-email textarea{min-height:180px}.collection-script-picker{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px}.collection-script-picker small{flex-basis:100%}@media(max-width:850px){.negotiation-balances:has(>div:nth-child(5)){grid-template-columns:repeat(2,minmax(0,1fr))}}
+.negotiation-dialog.negotiation-dialog{width:min(1380px,97vw)}
+.negotiation{font-family:'Segoe UI',Arial,sans-serif;line-height:1.5}
+.negotiation header{padding-bottom:12px;border-bottom:1px solid var(--line,#dce4ee)}
+.negotiation-ledger{margin:24px 0 28px;min-width:0}
+.negotiation-section-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.negotiation-section-head h3{margin:0;font-size:16px}.negotiation-section-head span{font-size:12px;color:var(--muted)}
+.negotiation-ledger-scroll{overflow:auto;max-height:430px;border:1px solid var(--line,#dce4ee);border-radius:7px}
+.negotiation .negotiation-ledger-table{min-width:1100px;width:100%;border-collapse:separate;border-spacing:0;font-size:12px;table-layout:auto}
+.negotiation-ledger-table th,.negotiation-ledger-table td{padding:12px 14px;vertical-align:middle;line-height:1.5;border-bottom:1px solid var(--line,#dce4ee)}
+.negotiation-ledger-table th{font-weight:600}.negotiation-ledger-table thead th{position:sticky;top:0;background:var(--panel,#f3f7fb);z-index:1;white-space:nowrap}
+.negotiation-ledger-table td:first-child{min-width:180px;max-width:270px;overflow-wrap:anywhere;white-space:normal}
+.negotiation-ledger-table .ledger-money{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.negotiation-ledger-table tfoot{font-weight:600;background:var(--panel,#f3f7fb)}
+.negotiation-explanation,.negotiation-period-note{font-size:12px;color:var(--muted);margin:10px 0;line-height:1.65}
+.negotiation .toolbar{padding:10px 0}.negotiation [data-charge-terms]{padding:12px 14px;background:var(--panel,#f3f7fb);border-radius:6px;font-size:12px}
+@media(max-width:700px){.negotiation-dialog{width:97vw}.negotiation-ledger-table th,.negotiation-ledger-table td{padding:10px}.negotiation-ledger-scroll{max-height:380px}.negotiation .negotiation-balances strong{font-size:16px}}
+.form-grid>.contract-period-help{grid-column:1/-1;font-size:12px;line-height:1.65;color:var(--muted);padding:12px;background:var(--panel,#f3f7fb);border:1px solid var(--line,#dce4ee);border-radius:6px}
+.form-grid>.creditor-fee-schedule{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px;border:1px solid var(--line,#dce4ee);border-radius:7px}.creditor-fee-schedule legend{font-weight:600}.creditor-fee-schedule p{grid-column:1/-1;font-size:12px;line-height:1.6}.negotiation .negotiation-ledger-table{min-width:1300px}@media(max-width:650px){.form-grid>.creditor-fee-schedule{grid-template-columns:1fr}}
+/* Financial workspace: consistent row rhythm and emphasis, scoped to negotiation. */
+.negotiation-dialog .negotiation>header{padding-bottom:8px;margin-bottom:12px}
+.negotiation-dialog .negotiation>header h3{font-size:18px;line-height:1.45;color:var(--text,#20364d)}
+.negotiation-dialog .negotiation>header p{font-size:12px;margin-bottom:8px}
+.negotiation-dialog .negotiation-balances{gap:10px;margin:14px 0 22px}
+.negotiation-dialog .negotiation-balances>div{border-radius:6px;padding:15px 16px;background:var(--panel,#f5f7fa);box-shadow:none}
+.negotiation-dialog .negotiation-balances strong{font-size:21px;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.negotiation-dialog .negotiation>.negotiation-balances>div:last-child{background:#eaf3fc;border-color:#bfd5ed}
+.negotiation-dialog .negotiation-ledger{margin:20px 0 26px}
+.negotiation-dialog .negotiation-section-head{padding:0 0 4px;align-items:center}
+.negotiation-dialog [data-quote-sync]{font-size:11px;color:#647b8e;line-height:1.5}
+.negotiation-dialog [data-quote-sync]::before{content:'●';color:#278968;font-size:9px;margin-right:6px}
+.negotiation-dialog .negotiation-ledger-scroll{border-color:#dce4ec;border-radius:6px;max-height:450px}
+.negotiation-dialog .negotiation-ledger-table{min-width:1150px;font-size:12px;table-layout:fixed}
+.negotiation-dialog .negotiation-ledger-table th,.negotiation-dialog .negotiation-ledger-table td{height:48px;box-sizing:border-box;padding:10px 12px;border-bottom:1px solid #e6ebf0;line-height:1.5}
+.negotiation-dialog .negotiation-ledger-table th{font-size:11px;letter-spacing:.1px;color:#496177;background:#f0f4f8}
+.negotiation-dialog .negotiation-ledger-table :is(th,td):first-child{width:21%;min-width:0;max-width:none;white-space:normal;overflow-wrap:anywhere;text-align:left}
+.negotiation-dialog .negotiation-ledger-table tbody tr:nth-child(odd) td{background:#fff}
+.negotiation-dialog .negotiation-ledger-table tbody tr:nth-child(even) td{background:#f8fafc}
+.negotiation-dialog .negotiation-ledger-table tbody tr:hover td{background:#eef5fc}
+.negotiation-dialog .negotiation-ledger-table thead th:not(:first-child):not(:nth-child(4)):not(:nth-child(5)){text-align:right}
+.negotiation-dialog .negotiation-ledger-table :is(th,td):nth-child(4),.negotiation-dialog .negotiation-ledger-table :is(th,td):nth-child(5){text-align:center;width:9%;white-space:nowrap}
+.negotiation-dialog .negotiation-ledger-table tbody td:last-child{color:#154d80;font-weight:600}
+.negotiation-dialog .negotiation-ledger-table tfoot :is(th,td){position:sticky;bottom:0;background:#eaf0f6;border-top:1px solid #cbd8e5;z-index:1;font-size:12px;font-weight:600;color:#203e5b}
+.negotiation-dialog .negotiation-ledger-table tfoot th{width:21%}
+.negotiation-dialog .negotiation-period-note{font-size:11px;margin-top:9px;line-height:1.6}
+.negotiation-dialog .negotiation-explanation{display:none}
+html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table tbody tr:nth-child(odd) td{background:#203247}
+html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table tbody tr:nth-child(even) td{background:#263a50}
+html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table :is(th,tfoot td){background:#30465d;color:#dce7f2}
+html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table tbody td:last-child{color:#b9d9f8}
+@media(max-width:700px){.negotiation-dialog .negotiation-balances strong{font-size:17px}.negotiation-dialog .negotiation-balances>div{padding:12px}.negotiation-dialog .negotiation-section-head{align-items:flex-start;flex-direction:column}.negotiation-dialog .negotiation-ledger-table :is(th,td){height:46px}}
+
+/* Editable negotiation rates remain next to their monetary component. */
+.negotiation .negotiation-rate{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px;margin:9px 0 0;font-size:12px;font-weight:400}.negotiation-rate>span:first-child{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.negotiation-rate input{width:78px;min-height:34px;padding:6px 8px;text-align:right;box-sizing:border-box}.negotiation-ledger-table td:has(.negotiation-rate){min-width:125px;padding-top:14px;padding-bottom:14px}
+
+.negotiation-inputs{grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))}.negotiation-inputs select{width:100%;min-width:0}
