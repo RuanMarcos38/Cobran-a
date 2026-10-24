@@ -1,5 +1,6 @@
 import {readFile,readdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import {institutionalAsset} from '../prospection-assets.mjs';
 import {PGlite} from '@electric-sql/pglite';
 const db=new PGlite();
 await db.exec("create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;");
@@ -15,7 +16,7 @@ const as=async id=>db.exec(`reset role;set test.uid='${id}';set role authenticat
 const panel=async(action,payload={})=>(await db.query('select public.cobranca_prospect($1,$2) result',[action,JSON.stringify(payload)])).rows[0].result;
 const sync=async(token,payload)=>(await db.query('select public.cobranca_prospect_sync($1,$2) result',[token,JSON.stringify(payload)])).rows[0].result;
 const accountId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-await db.exec(`insert into cobranca_private.attendance_accounts(id,tenant_id,name,sector,channel,address,cipher) values('${accountId}','${tenant}','Comercial','commercial','email','sales@example.invalid','encrypted-placeholder-only');`);
+await db.exec(`insert into cobranca_private.attendance_accounts(id,tenant_id,name,sector,channel,address,cipher) values('${accountId}','${tenant}','Comercial','commercial','email','contato@rrestrategiaperformance.com.br','encrypted-placeholder-only');`);
 const sheet='test_sheet_reference_1234567890';
 await as(admin);
 const {token}=await panel('configure',{owner_id:admin,account_id:accountId,sheet_id:sheet});assert.equal(token.length,64);
@@ -39,7 +40,9 @@ await panel('pause',{paused:false});
 const claimed=(await sync(token,{operation:'claim'})).lead;assert.equal(claimed.id,lead.id);assert.match(claimed.mensagem,/remoção/);
 assert.equal((await sync(token,{operation:'claim'})).lead,null);
 await assert.rejects(()=>sync(token,{operation:'finish',attempt_id:claimed.attempt_id,status:'accepted'}));
-await sync(token,{operation:'finish',attempt_id:claimed.attempt_id,status:'accepted',provider_id:'<mock@example.invalid>'});
+await assert.rejects(()=>sync(token,{operation:'finish',attempt_id:claimed.attempt_id,status:'accepted',provider_id:'<mock@example.invalid>',attachments:[{...institutionalAsset,sha256:'wrong'}]}));
+await sync(token,{operation:'finish',attempt_id:claimed.attempt_id,status:'accepted',provider_id:'<mock@example.invalid>',attachments:[institutionalAsset]});
+await db.exec('reset role');const recordedAttachment=(await db.query("select attachments from cobranca_private.attendance_messages where provider_id='<mock@example.invalid>'")).rows[0].attachments;assert.deepEqual(recordedAttachment,[{index:0,...institutionalAsset}]);await as(admin);
 assert.equal((await sync(token,{operation:'finish',attempt_id:claimed.attempt_id,status:'accepted',provider_id:'<mock@example.invalid>'})).duplicate,true);
 assert.equal((await sync(token,{operation:'sheet_updates'})).length,1);
 await assert.rejects(()=>sync(token,{operation:'finish',attempt_id:claimed.attempt_id,status:'unknown'}));

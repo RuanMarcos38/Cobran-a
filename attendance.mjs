@@ -1,4 +1,5 @@
 import {handleMailMutation,verifyMailContact} from './mail-trash.mjs';
+import {institutionalMailbox,institutionalAsset,loadInstitutionalAttachment} from './prospection-assets.mjs';
 import {readMailboxes,imapMessageLocation} from './mail-imap.mjs';
 import {randomUUID} from 'node:crypto';
 import nodemailer from 'nodemailer';
@@ -103,7 +104,12 @@ export async function handleAttendance(operation,body,rpc,env=process.env){
    if(!base64||base64.length>6990508||!/^[A-Za-z0-9+/]+={0,2}$/.test(base64))throw publicError('Mídia indisponível ou maior que 5 MB.');
    return {base64,mime:file.mimetype||message.attachments?.[0]?.mime||'application/octet-stream',name:file.fileName||message.attachments?.[0]?.name||'anexo'};
   }
-  const stored=message.attachments?.[Number(body.index)];if(stored?.base64)return {name:stored.name,mime:stored.mime,base64:stored.base64};
+   const stored=message.attachments?.[Number(body.index)];
+   if(stored?.asset===institutionalAsset.asset){
+    if(account.address!==institutionalMailbox||message.direction!=='outbound'||message.status!=='accepted'||stored.sha256!==institutionalAsset.sha256)throw publicError('Anexo institucional não pertence a este envio.');
+    const asset=await loadInstitutionalAttachment();return {name:asset.name,mime:asset.mime,base64:asset.content.toString('base64')};
+   }
+   if(stored?.base64)return {name:stored.name,mime:stored.mime,base64:stored.base64};
   let location;try{location=imapMessageLocation(message);}catch{throw publicError('Identificador do e-mail inválido.');}
   const client=imapClient(cfg);try{
    await client.connect();const lock=await client.getMailboxLock(location.path,{readOnly:true});try{
