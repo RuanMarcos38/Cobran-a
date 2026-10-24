@@ -7,5 +7,5 @@ return updates.map(sent=>{
  if(sent.status!=='accepted'||!sent.provider_id||!sent.attempt_id||!sent.email)throw new Error('Falta confirmação do envio na ferramenta.');
  const original=originals.find(r=>String(r.email||'').trim().toLowerCase()===sent.email.toLowerCase());
  if(!original)return null;
- return {json:{email:original.email,status_email:'ENVIADO',situacao:sent.responded?'RESPONDEU':'CONTATADO',data_contato:sent.finished_at||new Date().toISOString(),tentativas:1}};
+ return {json:{email:original.email,status_email:'ENVIADO',situacao:sent.suppressed?'OPTOUT':sent.responded?'RESPONDEU':'CONTATADO',data_contato:sent.finished_at||new Date().toISOString(),tentativas:1}};
 }).filter(Boolean);

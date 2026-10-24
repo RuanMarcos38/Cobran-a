@@ -78,7 +78,7 @@ begin
     and (coalesce(payload->>'search','')='' or position(lower(left(payload->>'search',150)) in lower(q.company||' '||q.email||' '||q.document))>0)
    order by q.updated_at desc,q.id limit 100 offset least(100000,greatest(0,coalesce((payload->>'offset')::int,0)))
   ) x;
-  return result||jsonb_build_object('rows',rows,'view',view_name);
+  return result||jsonb_build_object('rows',rows,'view',view_name,'summary',(result->'summary')||jsonb_build_object('accepted',(select count(*) from cobranca_private.prospect_attempts a join cobranca_private.prospect_leads q on q.id=a.lead_id where a.tenant_id=p.tenant_id and a.status='accepted' and (p.role in ('admin','master','commercial_manager') or q.owner_id=p.id))));
  elsif action='detail' then
   select * into l from cobranca_private.prospect_leads where id=(payload->>'id')::uuid and tenant_id=p.tenant_id and (p.role in ('admin','master','commercial_manager') or owner_id=p.id);
   if l.id is null then raise exception 'Contato não encontrado';end if;
@@ -95,6 +95,7 @@ alter function cobranca_private.prospect_receive(text,jsonb) rename to prospect_
 create function cobranca_private.prospect_receive(token text,payload jsonb) returns jsonb language plpgsql security definer set search_path='' as $$
 declare c cobranca_private.prospect_connections;l cobranca_private.prospect_leads;result jsonb; op text:=payload->>'operation'; a cobranca_private.attendance_accounts; wp cobranca_private.attendance_accounts;p public.cobranca_profiles; ident uuid; phone text;
 begin
+ if octet_length(payload::text)>900000 then raise exception 'Lote excede o limite';end if;
  -- The original health operation validates token format, tenant and active owner.
  perform cobranca_private.prospect_receive_v1(token,jsonb_build_object('operation','health'));
  select * into c from cobranca_private.prospect_connections where token_hash=encode(sha256(convert_to(token,'UTF8')),'hex') for update;
@@ -108,10 +109,10 @@ begin
    'phones',coalesce((select jsonb_agg(jsonb_build_object('id',id,'phone',source->>'whatsapp')) from (select * from cobranca_private.prospect_leads where tenant_id=c.tenant_id and not suppressed and length(regexp_replace(coalesce(source->>'whatsapp',''),'[^0-9]','','g')) between 10 and 15 and (whatsapp_checked_at is null or whatsapp_checked_at<now()-interval '30 days') order by whatsapp_checked_at nulls first,imported_at,id limit 1) q),'[]'),
    'contacted',coalesce((select jsonb_agg(jsonb_build_object('id',q.id,'email',q.email,'provider_id',attempt.provider_id)) from cobranca_private.prospect_leads q join cobranca_private.prospect_attempts attempt on attempt.lead_id=q.id where q.tenant_id=c.tenant_id and not q.suppressed and attempt.status='accepted' and attempt.finished_at>now()-interval '90 days'),'[]'));
  elsif op='sheet_updates' then
-  return coalesce((select jsonb_agg(jsonb_build_object('status','accepted','id',q.id,'email',q.email,'attempt_id',attempt.id,'provider_id',attempt.provider_id,'finished_at',attempt.finished_at,'responded',q.status='responded')) from (select * from cobranca_private.prospect_leads where tenant_id=c.tenant_id and status in ('accepted','responded') and coalesce(source->>'status_email','')<>'ENVIADO' order by imported_at,id limit 20) q join cobranca_private.prospect_attempts attempt on attempt.lead_id=q.id and attempt.status='accepted'),'[]');
+  return coalesce((select jsonb_agg(jsonb_build_object('status','accepted','id',q.id,'email',q.email,'attempt_id',attempt.id,'provider_id',attempt.provider_id,'finished_at',attempt.finished_at,'responded',q.status='responded','suppressed',q.suppressed)) from (select * from cobranca_private.prospect_leads where tenant_id=c.tenant_id and status in ('accepted','responded') and (coalesce(source->>'status_email','')<>'ENVIADO' or (status='responded' and coalesce(source->>'situacao','')<>'RESPONDEU' and not suppressed) or (suppressed and coalesce(source->>'situacao','')<>'OPTOUT')) order by imported_at,id limit 20) q join cobranca_private.prospect_attempts attempt on attempt.lead_id=q.id and attempt.status='accepted'),'[]');
  elsif op='automation_status' then
-  if payload->>'channel' not in ('email','whatsapp') or payload->>'status'<>'unavailable' then raise exception 'Estado inválido';end if;
-  update cobranca_private.prospect_connections set automation_state=automation_state||jsonb_build_object(payload->>'channel',jsonb_build_object('status','unavailable','checked_at',now())) where tenant_id=c.tenant_id;
+  if payload->>'channel' not in ('email','whatsapp') or payload->>'status' not in ('ready','unavailable') then raise exception 'Estado inválido';end if;
+  update cobranca_private.prospect_connections set automation_state=automation_state||jsonb_build_object(payload->>'channel',jsonb_build_object('status',payload->>'status','checked_at',now())) where tenant_id=c.tenant_id;
   return jsonb_build_object('saved',true);
  elsif op='email_check' then
   update cobranca_private.prospect_leads set email_domain_valid=(payload->>'valid')::boolean,email_checked_at=now(),checked_email=email where id=(payload->>'id')::uuid and tenant_id=c.tenant_id and email=payload->>'email' and status='pending' and not suppressed;

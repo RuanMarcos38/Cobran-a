@@ -32,6 +32,7 @@ export async function automateProspects(rpc,env=process.env,{lookup=resolveMx,de
     const lead=c.contacted.find(l=>l.email===m.address&&refs.includes(l.provider_id));if(!lead)continue;
     await rpc({operation:'reply',id:lead.id,email:m.address,provider_id:m.mail_message_id,in_reply_to:lead.provider_id,classification:classifyReply(m.content),content:String(m.content).slice(0,5000)});replies++;
    }
+   await rpc({operation:'automation_status',channel:'email',status:'ready'});
   }catch{await rpc({operation:'automation_status',channel:'email',status:'unavailable'});}
  }
  const wa=c.whatsapp,lead=(c.phones||[])[0];
@@ -46,8 +47,10 @@ export async function automateProspects(rpc,env=process.env,{lookup=resolveMx,de
    const found=Array.isArray(rows)?rows.find(x=>normalizePhone(x.number||x.jid?.split('@')[0])===number):null;
    if(!found||typeof found.exists!=='boolean')throw Error('Evidence');
    await rpc({operation:'whatsapp_check',id:lead.id,number,exists:found.exists});whatsapp++;
+   await rpc({operation:'automation_status',channel:'whatsapp',status:'ready'});
   }catch{await rpc({operation:'automation_status',channel:'whatsapp',status:'unavailable'});}
  }
+ if(!wa&&lead)await rpc({operation:'automation_status',channel:'whatsapp',status:'unavailable'});
  await rpc({operation:'auto_approve'});
  return {enabled:true,domains,replies,whatsapp};
 }

@@ -78,6 +78,7 @@ assert.ok((await panel('list',{view:'history'})).rows.some(r=>r.status==='accept
 const reply={operation:'reply',id:lead.id,email:lead.email,provider_id:'<real-reply-fixture>',in_reply_to:'<mock@example.invalid>',classification:'positive',content:'Tenho interesse em conhecer.'};
 await assert.rejects(()=>sync(autoToken,{...reply,in_reply_to:'<unrelated>'}));
 await sync(autoToken,reply);assert.equal((await find(lead.email)).status,'responded');assert.equal((await board()).rows.length,2);
+assert.equal((await panel('list')).summary.accepted,1);
 await db.exec('reset role');assert.equal((await db.query("select count(*)::int n from cobranca_private.attendance_messages where provider_id in ('<mock@example.invalid>','<real-reply-fixture>')")).rows[0].n,2);await as(admin);
 assert.equal((await sync(autoToken,reply)).duplicate,true);assert.equal((await board()).rows.length,2);
 await sync(autoToken,{...reply,provider_id:'<optout-fixture>',classification:'optout',content:'Remova meu contato'});assert.equal((await board()).rows.length,1);
