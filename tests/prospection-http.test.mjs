@@ -8,6 +8,7 @@ test('prospection API isolates its scope and never forwards bearer credentials',
   assert.equal((await fetch(url,{method:'POST',headers,body:JSON.stringify({operation:'health'})})).status,200);
   assert.equal(received.url,'/rest/v1/rpc/cobranca_prospect_sync');assert.equal(received.headers.authorization,undefined);assert.equal(received.body.token,'a'.repeat(64));
   assert.equal((await fetch(url,{method:'POST',headers,body:JSON.stringify({operation:'sender'})})).status,400);
+  for(const operation of ['finish','claim','reply','whatsapp_check','email_check','automation_context','auto_approve'])assert.equal((await fetch(url,{method:'POST',headers,body:JSON.stringify({operation})})).status,400);
   const rejected=await fetch(url,{method:'POST',headers:{...headers,'X-Integration-Key':'invalid'},body:'{}'});assert.equal(rejected.status,401);assert.ok(!(await rejected.text()).includes('secret internal detail'));
  }finally{await Promise.all([new Promise(r=>server.close(r)),new Promise(r=>upstream.close(r))]);}
 });

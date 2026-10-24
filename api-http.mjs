@@ -1,5 +1,6 @@
 import {handleAttendance} from './attendance.mjs';
 import {dispatchProspect} from './prospection-mail.mjs';
+import {automateProspects} from './prospection-automation.mjs';
 import {handleBank} from './bank.mjs';
 import {parseBorderoCsv} from './bordero-csv.mjs';
 import {handleChannel} from './whatsapp.mjs';
@@ -23,10 +24,12 @@ export async function handleApi(req,res,env=process.env){
  if(!bordero&&operation!=='public_booking'&&!/^Bearer [A-Za-z0-9._-]+$/.test(authorization||'')){send(401,{error:'Autenticação Bearer obrigatória'});return true;}
  if(operation==='commercial_prospection'){
   try{
-   if(body.operation==='sender'){send(400,{error:'Operação reservada ao servidor'});return true;}
+   if(body.operation&&!['health','mirror','dispatch'].includes(body.operation)){send(400,{error:'Operação reservada ao servidor'});return true;}
    if(body.operation==='dispatch'){
     const rpc=async payload=>{const r=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/cobranca_prospect_sync',{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({token:req.headers['x-integration-key'],payload}),signal:AbortSignal.timeout(20000)});const d=await r.json();if(!r.ok)throw Error('Fila comercial indisponível');return d;};
-    send(200,{data:await dispatchProspect(rpc,env)});return true;
+    const automation=await automateProspects(rpc,env);
+    const delivery=await dispatchProspect(rpc,env);
+    send(200,{data:{...delivery,automation,sheet_updates:await rpc({operation:'sheet_updates'})}});return true;
    }
    const upstream=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/cobranca_prospect_sync',{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({token:req.headers['x-integration-key'],payload:body}),signal:AbortSignal.timeout(20000)});
    const result=await upstream.json();send(upstream.ok?200:result.code==='28000'?401:400,upstream.ok?{data:result}:{error:'Integração comercial rejeitada. Confira a chave, a planilha e o resultado informado.'});
