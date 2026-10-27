@@ -11,7 +11,7 @@ export async function serveUiFixture(db,admin){
   if(url.pathname==='/auth/v1/token')return send(200,{access_token:'fixture-token',refresh_token:'fixture-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:admin,email:'admin@example.invalid'}});
   if(url.pathname==='/auth/v1/logout')return send(200,{});
   if(url.pathname.startsWith('/rest/v1/rpc/')){
-   const name=url.pathname.split('/').at(-1),body=await read(req);if(!['cobranca_app','cobranca_improvements','cobranca_booking_manage','cobranca_booking_prospect','cobranca_booking_public','cobranca_email'].includes(name))return send(404,{});
+   const name=url.pathname.split('/').at(-1),body=await read(req);if(!['cobranca_app','cobranca_improvements','cobranca_attendance','cobranca_mail_query','cobranca_booking_manage','cobranca_booking_prospect','cobranca_booking_public','cobranca_email'].includes(name))return send(404,{});
    try{const result=await db.transaction(async tx=>{await tx.exec(req.headers.authorization?`set local role authenticated;set local test.uid='${admin}'`:'set local role anon');const keys=Object.keys(body),sql='select public.'+name+'('+keys.map((_,i)=>'$'+(i+1)).join(',')+') as result';return (await tx.query(sql,keys.map(k=>typeof body[k]==='object'?JSON.stringify(body[k]):body[k]))).rows[0].result;});return send(200,result);}catch(error){return send(400,{message:error.message,code:error.code});}
   }
   if(url.pathname.startsWith('/api/')){await handleApi(req,res,env);return;}
