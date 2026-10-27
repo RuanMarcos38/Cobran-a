@@ -42,3 +42,6 @@ jobs:
       - run: node tests/financial-calendar.local.mjs
 
       - run: node tests/process-tabs.local.mjs
+      - run: node tests/accepted-kanban.local.mjs
+      - run: node tests/mail-query.local.mjs
+
