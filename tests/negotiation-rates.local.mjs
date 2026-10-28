@@ -1,3 +1,4 @@
+import {financialStatement} from '../web/negotiation-statement.mjs';
 import {simulateNegotiation,loadNegotiation} from '../web/negotiation.mjs';
 import {readFile,readdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -50,4 +51,30 @@ for(const frequency of ['weekly','fortnightly']){
  for(const id of frequencyIds){const detail=await rpc('detail',{id});assert.equal(detail.process.metadata.agreement_payment_frequency,frequency);assert.match(detail.agreements[0].notes,new RegExp(frequency));for(const row of detail.installments)assert.equal(row.due_date,fs.schedule.find(x=>x.number===row.installment_number).due_date);}
 }
 console.log('PASS semanal e quinzenal: simulação, datas gravadas, auditoria, centavos e rejeição de frequência inválida');
+
+await as(admin);
+const recover=async agreementId=>(await db.query('select public.cobranca_agreement_statement($1) result',[JSON.stringify({id:agreementId})])).rows[0].result;
+const recovered=await recover(result.agreements[0]);
+assert.equal(recovered.original_missing,false);assert.equal(recovered.components_missing,false);
+const recordedStatement=financialStatement(recovered.quote,recovered.simulation);
+assert.equal(Number(recordedStatement.total),Number(sim.total));
+assert.deepEqual(recovered.simulation.schedule.map(p=>Number(p.amount)),sim.schedule.map(p=>Number(p.amount)));
+assert.deepEqual(recovered.simulation.schedule.map(p=>p.due_date),sim.schedule.map(p=>p.due_date));
+assert.ok(recovered.quote.items.every(i=>i.quote.contract_quote));
+await as(other);await assert.rejects(()=>recover(result.agreements[0]));
+await as(collector);assert.equal(Number((await recover(result.agreements[0])).simulation.total),Number(sim.total));
+await as(admin);await db.exec('reset role');
+// Reopening uses recorded snapshots even if the debt's current metadata changes.
+await db.query("update public.cobranca_debts set metadata=metadata-'agreement_quote' where id=any($1::uuid[])",[ids]);
+await as(admin);assert.deepEqual((await recover(result.agreements[0])).quote,recovered.quote);
+await db.exec('reset role');
+// Controlled legacy fixture: snapshots missing, but the original frozen quotes remain.
+for(const item of recovered.quote.items){await db.query("update public.cobranca_debts set metadata=metadata||jsonb_build_object('agreement_quote',$2::jsonb) where id=$1",[item.id,JSON.stringify({...item.quote,contract_quote:undefined})]);}
+await db.query('update public.cobranca_agreements set financial_snapshot=null where id=any($1::uuid[])',[result.agreements]);
+await as(admin);const legacy=await recover(result.agreements[0]);assert.equal(legacy.original_missing,true);assert.equal(legacy.components_missing,false);financialStatement(legacy.quote,legacy.simulation);
+await db.exec('reset role');await db.query("update public.cobranca_debts set metadata=metadata-'agreement_quote' where id=any($1::uuid[])",[ids]);
+await as(admin);const incomplete=await recover(result.agreements[0]);assert.equal(incomplete.components_missing,true);assert.equal(Number(incomplete.simulation.total),Number(sim.total));
+await db.exec('reset role;set role anon');await assert.rejects(()=>recover(result.agreements[0]));
+console.log('PASS recuperação: snapshots, parcelas efetivamente gravadas, recarga, dados legados incompletos sem reconstrução, permissões e isolamento');
+
 await db.exec('reset role;set role anon');await assert.rejects(()=>joint('quote',{ids}));console.log('PASS percentuais: juros, multa, honorários, alçada combinada, contrato preservado e acordo com valores recalculados; proposta conjunta: seleção completa, centavos, rateio e parcelas consolidadas, calendário, saldo conferido sob bloqueio, duplicação e isolamento; nenhum recebimento fictício');await db.close();
