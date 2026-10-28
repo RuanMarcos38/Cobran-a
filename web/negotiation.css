@@ -57,6 +57,8 @@ html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table tbody td:las
 @media(max-width:700px){.negotiation-dialog .negotiation-balances strong{font-size:17px}.negotiation-dialog .negotiation-balances>div{padding:12px}.negotiation-dialog .negotiation-section-head{align-items:flex-start;flex-direction:column}.negotiation-dialog .negotiation-ledger-table :is(th,td){height:46px}}
 
 /* Editable negotiation rates remain next to their monetary component. */
+.negotiation-comparison{width:100%;min-width:580px}.negotiation-comparison td{text-align:right;white-space:nowrap}.negotiation-comparison tbody tr:last-child{font-weight:700}.negotiation-title-statement{margin:12px 0;padding:12px;border:1px solid var(--line,#d9e2ed);border-radius:6px}.negotiation-title-statement summary{cursor:pointer;font-weight:600}.negotiation-review{margin:18px 0;padding:14px;background:var(--surface,#f1f4f8);border:1px solid var(--line,#d9e2ed);border-radius:6px}.negotiation-review p{line-height:1.6}
 .negotiation .negotiation-rate{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px;margin:9px 0 0;font-size:12px;font-weight:400}.negotiation-rate>span:first-child{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.negotiation-rate input{width:78px;min-height:34px;padding:6px 8px;text-align:right;box-sizing:border-box}.negotiation-ledger-table td:has(.negotiation-rate){min-width:125px;padding-top:14px;padding-bottom:14px}
 
 .negotiation-inputs{grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))}.negotiation-inputs select{width:100%;min-width:0}
+.negotiation-statement-note{font-size:12px;color:var(--muted);line-height:1.65;overflow-wrap:anywhere}.negotiation-review{background:var(--panel,#f1f4f8)}
