@@ -25,18 +25,22 @@ O desconto geral existente incide no saldo inteiro. Para demonstrar sua composi�
 - `node tests/negotiation-rates.local.mjs`: aprovado, com PostgreSQL local PGlite e dados controlados; taxas, alçada combinada, contrato preservado, acordo, rateio, parcelas, periodicidades e isolamento.
 - `node tests/negotiation-statement-ui.mjs`: aprovado no Chrome headless; comparativo, edição de descontos/taxas, entrada, parcelas, celular, confirmação, cancelamento e recarga. A API desse teste é local e não acessa produção.
 
+## Recuperação de acordos
+
+O botão Demonstrativo do acordo recupera cotação, valores por título e parcelas efetivamente gravadas. Novos acordos preservam `financial_snapshot` na mesma transação da formalização. Quando há redução de taxas, a composição contratual é retornada no mesmo snapshot da cotação oficial. O cálculo financeiro permanece igual.
+
+Acordos antigos utilizam apenas a memória financeira congelada que ainda pertence ao acordo selecionado. Se a composição original anterior às reduções não foi guardada, a tela e os documentos deixam esse limite explícito. Na ausência da memória de componentes, mostram-se total e parcelas gravados; componentes não são inventados nem recalculados com o contrato atual.
+
 ## Preservação e reversão
 
-Nenhuma alteração de banco, migração, credencial ou integração. Não foram modificados os mecanismos oficiais de cálculo, as regras de acesso ou os eventos de auditoria existentes. Nenhuma simulação é persistida por esta alteração.
+A evolução `041-agreement-statements.sql`, também versionada em `supabase/migrations/20261028174119_agreement_statements.sql`, adiciona uma coluna nullable sem backfill. Não altera valores históricos, credenciais, fórmulas, contratos ou integrações. Não cria simulações permanentes. O snapshot é produzido pelo servidor apenas durante a formalização já autorizada pelo operador. A leitura valida empresa, perfil, acesso a todos os títulos do grupo e conciliação das parcelas.
 
-A versão anterior do código está preservada no commit base. A proposta fica em branch separada. Antes de eventual implantação, registrar a revisão atualmente implantada e o artefato de publicação; reverter consiste em restaurar esse artefato ou reverter o commit desta proposta. Não há migração de dados para reverter.
+Backup das definições das funções obtido em produção antes da alteração. O script de reversão `database/rollback/041-agreement-statements.sql` restaura as funções e desabilita a nova consulta, preservando os snapshots já gravados. A versão anterior da aplicação está preservada no commit `58469a827d4e2747012e0fff5b13bcf9f3404671`.
 
-## Status e pendências
+## Ambiente e validação
 
-Implementação preparada para revisão; não implantada e não validada no ambiente real. A aprovação da proposta não equivale à implantação. A origem exata da publicação e a versão em produção não foram confirmadas neste trabalho.
+Serviço identificado: Easypanel `r2rmarketingdigital/cobranca`, domínio `financeiro.rrestrategiaperformance.com.br`, branch `codex/saas-cobranca`, banco Supabase `makpnbqtebtyrqyqdbru` na organização Cobrança. Nenhum outro serviço deve ser alterado.
 
-O demonstrativo adicional de acordo é exportado na sessão em que a formalização retorna sucesso. A reconstrução desse novo detalhamento em acordos históricos, após reabrir a página, não está incluída: ela exigiria definir e persistir um snapshot oficial adicional no fluxo do servidor. Os documentos e históricos já existentes continuam disponíveis.
+Pré-conferência em produção: zero acordos formalizados e zero parcelas de acordos. As funções financeiras correspondiam às versões preservadas antes da evolução. Não são criados acordos fictícios para homologação em produção.
 
-A conferência original por componentes utiliza duas leituras oficiais e verifica data-base e total contratual; não constitui um snapshot transacional conjunto. O servidor continua validando sua própria assinatura antes de gravar o acordo. Antes da disponibilização em produção, revisar esse limite e decidir se o servidor deverá retornar a composição contratual no mesmo snapshot.
-
-Os testes de navegador usam uma API controlada; os testes de banco validam separadamente o fluxo real de formalização. Ainda é necessária a homologação integrada com o ambiente de publicação e os contratos reais autorizados.
+Testes locais: regressão unitária aprovada; teste adicional de recuperação aprovado; PGlite validou snapshots, parcelas, recuperação após mudança nos dados correntes, ausência de memória histórica, permissões e isolamento. Teste de navegador com API local controlada aprovado. A implantação e a conferência de publicação devem ser registradas no relatório de entrega.

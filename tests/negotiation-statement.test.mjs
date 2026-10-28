@@ -4,9 +4,17 @@ import {financialStatement,statementQuote,recordedMatches} from '../web/negotiat
 import {simulateNegotiation} from '../web/negotiation.mjs';
 import {proposalRows,proposalPdf,proposalXlsx} from '../web/proposal-export.mjs';
 import {cents} from '../web/money.mjs';
+import {recoveredStatement} from '../web/agreement-statement.mjs';
 const original={principal:'1000',interest:'100',fine:'20',fees:'112',total:'1232',as_of:'2026-10-28'};
 const proposal={discount_percent:'0',down_payment:'0',installments:'1',first_due_date:'2027-01-31'};
 const sum=values=>values.reduce((n,v)=>n+cents(v),0n);
+test('recovered agreement uses exact title totals and identifies missing legacy composition',()=>{
+ const quote={...original,items:[{id:'a',reference:'DOC',quote:original,recorded_total:'1200'}]},s={...simulateNegotiation(original,proposal,100),total:'1200',schedule:[{number:1,amount:'1200',due_date:'2027-01-31'}]};
+ const data={quote,simulation:s};assert.equal(recoveredStatement(data).titles[0].total,'1200.00');
+ const legacy=recoveredStatement({...data,original_missing:true});assert.ok(legacy.contractUnavailable);assert.match(legacy.note,/não foi preservada/);
+ assert.equal(recoveredStatement({...data,components_missing:true}),null);
+ assert.throws(()=>recoveredStatement({...data,quote:{...quote,items:[{...quote.items[0],recorded_total:'1199'}]}}),/não conciliados/);
+});
 for(const component of ['none','interest','fine','fees','combined'])test('statement reconciles '+component+' reduction without changing quotes',()=>{
  const q=structuredClone(original);if(component==='combined'){q.interest='50';q.fine='10';q.fees='53';}else if(component!=='none')q[component]='0';
  q.total=String(Number(q.principal)+Number(q.interest)+Number(q.fine)+Number(q.fees));

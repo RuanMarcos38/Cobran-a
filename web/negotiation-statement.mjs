@@ -8,6 +8,7 @@ export function recordedMatches(recorded,simulation){
 }
 export async function statementQuote(rpc,payload){
  const quote=await rpc('quote',payload);
+ if(quote.items?.every(i=>!i.quote.rate_overrides||i.quote.contract_quote))return quote;
  if(!Object.keys(payload.rate_overrides||{}).length)return quote;
  const original=await rpc('quote',{...payload,rate_overrides:{}});
  if(original.as_of!==quote.as_of||cents(original.total)!==cents(quote.contract_total))throw Error('Saldo contratual alterado durante a conferência. Recalcule os valores.');
@@ -27,7 +28,8 @@ function amounts(q){
 }
 export function financialStatement(quote,s){
  const items=quote.items||[{id:'single',reference:'Título',quote}];
- const totals=allocate(cents(s.total),items.map(i=>cents(i.quote.total)));
+ const totals=items.every(i=>i.recorded_total!==undefined)?items.map(i=>cents(i.recorded_total)):allocate(cents(s.total),items.map(i=>cents(i.quote.total)));
+ if(sum(totals)!==cents(s.total))throw Error('Totais gravados por título não conciliados.');
  const titles=items.map((item,index)=>{
   const q=item.quote,original=q.contract_quote||q;
   if(q.rate_overrides&&!q.contract_quote)throw Error('Composição contratual pendente de conferência.');

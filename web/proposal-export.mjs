@@ -10,7 +10,7 @@ export function proposalRows(detail,quote,s){
   ['Principal',Number(quote.principal)],['Juros',Number(quote.interest)],['Multa',Number(quote.fine)],['Honorários',Number(quote.fees||0)],['Saldo atualizado',Number(quote.total)],['Desconto',Number(s.discount)],['Total negociado',Number(s.total)],['Entrada',Number(s.entry)],[],
   ['Título','Vencimento','Dias após carência','Principal','Juros','Multa','Honorários','Saldo','Juros (%)','Periodicidade','Multa (%)','Honorários (%)','Base honorários'],
   ...items.map(({reference,quote:q})=>[reference,date(q.due_date),q.days||0,Number(q.principal),Number(q.interest),Number(q.fine),Number(q.fees||0),Number(q.total),Number(q.terms?.interest_percent||0),({monthly:'Mensal / 30 dias',daily:'Diário',none:'Sem juros'}[q.terms?.mode]||'Sem juros'),Number(q.terms?.fine_percent||0),Number(q.terms?.fee_percent||0),q.terms?.fee_basis==='updated'?'Saldo com encargos':'Principal']),[],
-  ...(s.statement?[["DEMONSTRATIVO FINANCEIRO"],['Composição','Dívida atualizada','Proposta negociada','Desconto','% sobre componente original'],...s.statement.rows.map(r=>[r.label,Number(r.before),Number(r.after),Number(r.discount),r.percent+'%']),['Total',Number(s.statement.before),Number(s.statement.total),Number(s.statement.discount),s.statement.percent+'%'],['Critério do demonstrativo',statementNote],['Desconto total (%)',s.statement.percent+'% de '+brl(s.statement.before)],...s.statement.titles.flatMap(t=>[["Título negociado",t.reference],...t.rows.map(r=>[t.reference+' · '+r.label,Number(r.before),Number(r.after),Number(r.discount),r.percent+'%'])])]:[]),
+  ...(s.statement?[["DEMONSTRATIVO FINANCEIRO"],['Composição',s.statement.contractUnavailable?'Saldo registrado antes do desconto geral':'Dívida atualizada','Proposta negociada','Desconto','% sobre componente original'],...s.statement.rows.map(r=>[r.label,Number(r.before),Number(r.after),Number(r.discount),r.percent+'%']),['Total',Number(s.statement.before),Number(s.statement.total),Number(s.statement.discount),s.statement.percent+'%'],['Critério do demonstrativo',s.statement.note||statementNote],['Desconto total (%)',s.statement.percent+'% de '+brl(s.statement.before)],...s.statement.titles.flatMap(t=>[["Título negociado",t.reference],...t.rows.map(r=>[t.reference+' · '+r.label,Number(r.before),Number(r.after),Number(r.discount),r.percent+'%'])])]:[]),
   ['Pagamento','Vencimento','Valor'],...s.schedule.map(p=>[p.label,date(p.due_date),Number(p.amount)]),...(s.formalized?[[],['Referência do acordo',s.reference],['Registro de aceite',s.reason]]:[])
  ];
 }
@@ -53,7 +53,7 @@ export function proposalXlsx(rows){
  if(d.statement.length){
   wide('DEMONSTRATIVO FINANCEIRO — ANTES E DEPOIS',2,28);
   for(const row of d.statement)add(row,4,28);
-  wide(d.get('Desconto total (%)'),3,26);wide(statementNote,3,60);
+  wide(d.get('Desconto total (%)'),3,26);wide(d.get('Critério do demonstrativo')||statementNote,3,60);
   for(const title of d.statementTitles)wide('Título negociado: '+title,0,28);
  }
  wide('03  CONDIÇÕES DE PAGAMENTO',2,28);wide('Periodicidade das parcelas: '+d.get('Periodicidade das parcelas'),0,26);
@@ -108,7 +108,7 @@ export function proposalPdf(rows){
    if(typeof row[1]!=='number'){paragraph('Composição | Dívida atualizada | Proposta negociada | Desconto',9);continue;}
    paragraph(row[0]+': '+brl(row[1])+' | '+brl(row[2])+' | '+brl(row[3])+' ('+row[4]+')',10);
   }
-  paragraph('Desconto total: '+d.get('Desconto total (%)'),9);paragraph(statementNote,9);
+  paragraph('Desconto total: '+d.get('Desconto total (%)'),9);paragraph(d.get('Critério do demonstrativo')||statementNote,9);
   for(const title of d.statementTitles)paragraph('Título negociado: '+title,9);
  }
  // Keep short schedules together instead of leaving a few installments on a new page.

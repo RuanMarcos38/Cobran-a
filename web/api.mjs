@@ -1,4 +1,5 @@
 export let config;
+export async function agreementStatement(id){await rpc('profile');return request('/rest/v1/rpc/cobranca_agreement_statement',{method:'POST',body:JSON.stringify({payload:{id}})});}
 let session=null;let sessionEpoch=0;
 export async function init(){config=await fetch('/config').then(r=>r.json());try{session=JSON.parse(sessionStorage.getItem('cobranca_session')||'null');}catch{session=null;sessionStorage.removeItem('cobranca_session');}}
 export const authenticated=()=>!!session;
