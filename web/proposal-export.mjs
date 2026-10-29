@@ -30,7 +30,7 @@ function zip(files){
 const brand={navy:'0C1C32',blue:'1669BA',ink:'142B46',pale:'F1F4F8',line:'D9E2ED'};
 function reportData(rows){
  const head=rows.findIndex(r=>r[0]==='Título'),pay=rows.findIndex(r=>r[0]==='Pagamento');
- return {get:key=>rows.find(r=>r[0]===key)?.[1]??'',title:rows[0][0],items:rows.slice(head+1,pay).filter(r=>r.length===13),payments:rows.slice(pay+1).filter(r=>r.length===3),statement:rows.slice(head+1,pay).filter(r=>r.length===5),statementTitles:rows.slice(head+1,pay).filter(r=>r[0]==='Título negociado').map(r=>r[1])};
+ return {memory:rows[0][0]==='MEMÓRIA DO CÁLCULO FINANCEIRO',get:key=>rows.find(r=>r[0]===key)?.[1]??'',title:rows[0][0],items:rows.slice(head+1,pay).filter(r=>r.length===13),payments:rows.slice(pay+1).filter(r=>r.length===3),statement:rows.slice(head+1,pay).filter(r=>r.length===5),statementTitles:rows.slice(head+1,pay).filter(r=>r[0]==='Título negociado').map(r=>r[1])};
 }
 export function proposalXlsx(rows){
  const d=reportData(rows),out=[],merges=[];
@@ -41,9 +41,10 @@ export function proposalXlsx(rows){
  for(const key of ['Devedor','Credor','Atualização','Situação'])wide(`${key}: ${d.get(key)}`,0,key==='Situação'?32:24);
  wide('01  COMPOSIÇÃO DO DÉBITO — VALORES EM REAIS',2,28);
  for(const key of ['Principal','Juros','Multa','Honorários','Saldo atualizado','Desconto','Total negociado','Entrada']){
-  const n=add([key,Number(d.get(key))],['Saldo atualizado','Total negociado'].includes(key)?5:4,25);merges.push(`C${n}:M${n}`);
+  if(d.memory&&['Desconto','Entrada'].includes(key))continue;
+  const n=add([d.memory&&key==='Total negociado'?'Saldo apurado':key,Number(d.get(key))],['Saldo atualizado','Total negociado'].includes(key)?5:4,25);merges.push(`C${n}:M${n}`);
  }
- wide('Encargos simulados antes do desconto geral. O demonstrativo abaixo apresenta as reduções e o rateio de apresentação.',3,30);
+ wide(d.memory?'Memória do saldo contratual. Não representa proposta ou acordo. Recebimentos já considerados pelo motor.':'Encargos simulados antes do desconto geral. O demonstrativo abaixo apresenta as reduções e o rateio de apresentação.',3,30);
  wide('02  DETALHAMENTO DOS TÍTULOS E CONDIÇÕES CONTRATUAIS',2,28);
  const header=add(['Título','Vencimento','Dias após carência','Principal (R$)','Juros (R$)','Multa (R$)','Honorários (R$)','Saldo (R$)','Juros (%)','Periodicidade','Multa (%)','Honorários (%)','Base honorários'],1,38);
  for(const row of d.items)add(row,6,30);
@@ -51,15 +52,15 @@ export function proposalXlsx(rows){
  add(['TOTAL','','',Number(d.get('Principal')),Number(d.get('Juros')),Number(d.get('Multa')),Number(d.get('Honorários')),Number(d.get('Saldo atualizado'))],5,28);
  wide('Base “Saldo com encargos”: principal + juros + multa. Dias apresentados já consideram a carência contratual.',3,30);
  if(d.statement.length){
-  wide('DEMONSTRATIVO FINANCEIRO — ANTES E DEPOIS',2,28);
-  for(const row of d.statement)add(row,4,28);
+  wide(d.memory?'COMPOSIÇÃO DO SALDO APURADO':'DEMONSTRATIVO FINANCEIRO — ANTES E DEPOIS',2,28);
+  for(const row of d.statement)add(d.memory?[row[0],row[1]]:row,4,28);
   wide(d.get('Desconto total (%)'),3,26);wide(d.get('Critério do demonstrativo')||statementNote,3,60);
   for(const title of d.statementTitles)wide('Título negociado: '+title,0,28);
  }
- wide('03  CONDIÇÕES DE PAGAMENTO',2,28);wide('Periodicidade das parcelas: '+d.get('Periodicidade das parcelas'),0,26);
- add(['Pagamento','Vencimento','Valor (R$)'],1,28);
+ wide(d.memory?'03  RECEBIMENTOS REGISTRADOS':'03  CONDIÇÕES DE PAGAMENTO',2,28);wide('Periodicidade das parcelas: '+d.get('Periodicidade das parcelas'),0,26);
+ add(d.memory?['Recebimento','Data do recebimento','Valor (R$)']:['Pagamento','Vencimento','Valor (R$)'],1,28);
  for(const row of d.payments)add(row,7,24);
- add(['Total negociado','',Number(d.get('Total negociado'))],5,28);
+ add([d.memory?'Saldo apurado':'Total negociado','',Number(d.get('Total negociado'))],5,28);
  for(const key of ['Referência do acordo','Registro de aceite'])if(d.get(key))wide(`${key}: ${d.get(key)}`,0,38);
  wide(d.get('Situação'),3,30);
  const col=n=>String.fromCharCode(65+n);
@@ -89,9 +90,9 @@ export function proposalPdf(rows){
  paragraph(`Devedor: ${d.get('Devedor')}`,11);y+=5;paragraph(`Credor: ${d.get('Credor')}`,11);
  section('01  COMPOSIÇÃO DO DÉBITO');
  for(const [i,key] of ['Principal','Juros','Multa','Honorários'].entries()){const x=36+(i%2)*269;if(i%2===0)need(66);box(x,y-4,257,57,brand.pale);text(key,x+12,y+13,10);text(brl(d.get(key)),x+12,y+36,17,true);if(i%2)y+=67;}
- for(const key of ['Saldo atualizado','Desconto','Entrada']){text(key,44,y+12,11);right(brl(d.get(key)),549,y+12,11,true);y+=26;}
- box(36,y,523,43,brand.navy);text('TOTAL NEGOCIADO',48,y+26,12,true,'FFFFFF');const amount=brl(d.get('Total negociado'));text(amount,547-amount.length*9,y+27,17,true,'FFFFFF');y+=61;
- paragraph('Encargos simulados antes do desconto geral. Confira as reduções no demonstrativo abaixo.',9,'52677F');
+ for(const key of (d.memory?['Saldo atualizado']:['Saldo atualizado','Desconto','Entrada'])){text(key,44,y+12,11);right(brl(d.get(key)),549,y+12,11,true);y+=26;}
+ box(36,y,523,43,brand.navy);text(d.memory?'SALDO APURADO':'TOTAL NEGOCIADO',48,y+26,12,true,'FFFFFF');const amount=brl(d.get('Total negociado'));text(amount,547-amount.length*9,y+27,17,true,'FFFFFF');y+=61;
+ paragraph(d.memory?'Memória do saldo contratual. Não representa proposta ou acordo.':'Encargos simulados antes do desconto geral. Confira as reduções no demonstrativo abaixo.',9,'52677F');
  section('02  MEMÓRIA DOS TÍTULOS');
  paragraph('Valores em reais. Cada título apresenta os encargos e os parâmetros contratuais utilizados.',9,'52677F');y+=6;
  for(const r of d.items){const titleLines=wrap(`Título: ${r[0]}`,79),termLines=wrap(`Juros: ${r[8]}% (${r[9]}) | Multa: ${r[10]}% | Honorários: ${r[11]}% sobre ${r[12]}`,100);need(95+titleLines.length*13+termLines.length*12);
@@ -103,19 +104,19 @@ export function proposalPdf(rows){
  }
  paragraph('Honorários sobre saldo com encargos = principal + juros + multa. Os dias informados já consideram a carência contratual.',9,'52677F');
  if(d.statement.length){
-  section('DEMONSTRATIVO FINANCEIRO — ANTES E DEPOIS');
+  section(d.memory?'COMPOSIÇÃO DO SALDO APURADO':'DEMONSTRATIVO FINANCEIRO — ANTES E DEPOIS');
   for(const row of d.statement){
-   if(typeof row[1]!=='number'){paragraph('Composição | Dívida atualizada | Proposta negociada | Desconto',9);continue;}
-   paragraph(row[0]+': '+brl(row[1])+' | '+brl(row[2])+' | '+brl(row[3])+' ('+row[4]+')',10);
+   if(typeof row[1]!=='number'){paragraph(d.memory?'Composição | Valor registrado':'Composição | Dívida atualizada | Proposta negociada | Desconto',9);continue;}
+   paragraph(d.memory?row[0]+': '+brl(row[1]):row[0]+': '+brl(row[1])+' | '+brl(row[2])+' | '+brl(row[3])+' ('+row[4]+')',10);
   }
-  paragraph('Desconto total: '+d.get('Desconto total (%)'),9);paragraph(d.get('Critério do demonstrativo')||statementNote,9);
+  if(!d.memory)paragraph('Desconto total: '+d.get('Desconto total (%)'),9);paragraph(d.get('Critério do demonstrativo')||statementNote,9);
   for(const title of d.statementTitles)paragraph('Título negociado: '+title,9);
  }
  // Keep short schedules together instead of leaving a few installments on a new page.
- need(Math.min(630,120+d.payments.length*26));section('03  CONDIÇÕES DE PAGAMENTO');text('Periodicidade: '+d.get('Periodicidade das parcelas'),44,y+2,10);y+=22;
- const paymentHeader=()=>{box(36,y-12,523,25,brand.pale);text('Pagamento',44,y+4,10,true);text('Vencimento',308,y+4,10,true);text('Valor (R$)',455,y+4,10,true);y+=30;};paymentHeader();
- for(const [i,p] of d.payments.entries()){if(y+30>778){newPage();section('CONDIÇÕES DE PAGAMENTO — CONTINUAÇÃO');paymentHeader();}if(i%2===0)box(36,y-12,523,25,'F8FAFC');text(p[0],44,y+4,10);text(p[1],308,y+4,10);right(brl(p[2]),549,y+4,10,true);y+=26;}
- need(48);text('Total negociado',44,y+10,11,true);right(brl(d.get('Total negociado')),549,y+10,11,true);y+=38;
+ need(Math.min(630,120+d.payments.length*26));section(d.memory?'03  RECEBIMENTOS REGISTRADOS':'03  CONDIÇÕES DE PAGAMENTO');text('Periodicidade: '+d.get('Periodicidade das parcelas'),44,y+2,10);y+=22;
+ const paymentHeader=()=>{box(36,y-12,523,25,brand.pale);text(d.memory?'Recebimento':'Pagamento',44,y+4,10,true);text(d.memory?'Recebido em':'Vencimento',308,y+4,10,true);text('Valor (R$)',455,y+4,10,true);y+=30;};paymentHeader();
+ for(const [i,p] of d.payments.entries()){if(y+30>778){newPage();section(d.memory?'RECEBIMENTOS — CONTINUAÇÃO':'CONDIÇÕES DE PAGAMENTO — CONTINUAÇÃO');paymentHeader();}if(i%2===0)box(36,y-12,523,25,'F8FAFC');text(p[0],44,y+4,10);text(p[1],308,y+4,10);right(brl(p[2]),549,y+4,10,true);y+=26;}
+ need(48);text(d.memory?'Saldo apurado':'Total negociado',44,y+10,11,true);right(brl(d.get('Total negociado')),549,y+10,11,true);y+=38;
  for(const key of ['Referência do acordo','Registro de aceite'])if(d.get(key))paragraph(`${key}: ${d.get(key)}`,9);
  paragraph(d.get('Situação'),9,'52677F');pages.push(commands);
  const objects=['','<< /Type /Catalog /Pages 2 0 R >>','','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'],ids=[];
