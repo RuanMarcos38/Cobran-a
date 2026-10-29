@@ -22,6 +22,16 @@ try{
  await page.waitForFunction(()=>document.querySelector('.negotiation-review').textContent.includes('1.108,80'));
  await page.locator('[name=down_payment]').fill('100');await page.locator('[name=installments]').fill('3');await page.locator('[name=installments]').dispatchEvent('change');
  assert.equal(await page.locator('[data-installment-date]').count(),3);
+ await page.locator('[name=down_payment_due_date]').fill('2028-10-30');
+ await page.locator('[name=first_due_date]').fill('2028-11-19');await page.locator('[name=first_due_date]').dispatchEvent('change');
+ await page.locator('[name=payment_frequency]').selectOption('every20days');
+ assert.deepEqual(await page.locator('[data-installment-date]').evaluateAll(xs=>xs.map(x=>x.value)),['2028-11-19','2028-12-09','2028-12-29']);
+ assert.match(await page.locator('[data-negotiation-result]').innerText(),/30\/10\/2028/);
+ await page.locator('[name=first_due_date]').fill('2028-10-30');await page.locator('[name=first_due_date]').dispatchEvent('change');
+ assert.match(await page.locator('[data-negotiation-error]').innerText(),/depois da entrada/);
+ assert.equal(await page.locator('button[type=submit]').isEnabled(),false);
+ await page.locator('[name=first_due_date]').fill('2028-11-19');await page.locator('[name=first_due_date]').dispatchEvent('change');
+
  await page.locator('[name=discount_percent]').fill('0');await page.locator('[name=down_payment]').fill('0');
  await page.locator('[data-rate-key=interest_percent]').fill('0.5');
  await page.waitForFunction(()=>document.querySelector('.negotiation-review').textContent.includes('1.177,00'));
