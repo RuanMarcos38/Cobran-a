@@ -1,0 +1,21 @@
+{
+  "whatsapp": {
+    "pre_due": "Bom dia, {nome}. Passando para lembrar que existe um vencimento programado para {due_date}. Posso te enviar o link atualizado para pagamento?",
+    "d0_d2": "{saudacao}, {nome}. Identificamos uma pendência recente no valor de {valor}. Quer que eu te envie o link/Pix atualizado para regularizar?",
+    "d3_d6": "{nome}, estou passando de forma rápida para te ajudar com a pendência em aberto. Posso verificar uma opção de pagamento ou negociação para você?",
+    "d7_d14": "{nome}, sua pendência continua em aberto. Para evitar transtornos administrativos, posso te ajudar agora com pagamento à vista ou uma proposta de acordo?",
+    "d15_d29": "{nome}, precisamos atualizar a situação do seu contrato. Antes de encaminhar para análise interna, posso registrar uma previsão de pagamento ou proposta?",
+    "d30_plus": "{nome}, seu caso precisa de uma revisão mais cuidadosa. Vou encaminhar para um especialista da assessoria verificar a melhor alternativa de regularização."
+  },
+  "email": {
+    "subject": "Regularização de pendência - {credor}",
+    "body": "Olá, {nome}.\n\nIdentificamos uma pendência vinculada ao contrato {contrato}, com vencimento em {due_date}.\n\nValor atualizado: {valor}.\n\nVocê pode regularizar pelo link: {payment_link}\n\nCaso já tenha pago ou não reconheça esta cobrança, responda este e-mail para conferirmos com prioridade.\n\nAtenciosamente,\nEquipe de Atendimento"
+  },
+  "safety_rules": [
+    "Nunca ameaçar, constranger, expor, ridicularizar ou pressionar o devedor.",
+    "Não informar dívida a terceiros.",
+    "Não continuar cobrança automática quando houver contestação, comprovante, pagamento informado ou pedido de atendimento humano.",
+    "Manter mensagens curtas, educadas e consultivas.",
+    "Registrar tudo em trilha de auditoria."
+  ]
+}

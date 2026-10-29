@@ -1,0 +1,30 @@
+import {simulateNegotiation,loadNegotiation} from '../web/negotiation.mjs';
+import {readFile,readdir} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+import {PGlite} from '@electric-sql/pglite';
+const db=new PGlite();
+await db.exec("create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;");
+const files=(await readdir(new URL('../database/',import.meta.url))).filter(n=>/^\d.*\.sql$/.test(n)).sort();
+for(const name of ['supabase-schema.sql',...files]){
+ try{
+  if(name==='019-booking-links.sql')await db.exec(await readFile(new URL('../supabase/migrations/20261019005921_n8n_commercial_schedule.sql',import.meta.url),'utf8'));
+  await db.exec((await readFile(new URL('../database/'+name,import.meta.url),'utf8')).replace('create extension if not exists "pgcrypto";',''));
+ }catch(e){console.error('MIGRATION',name,e.message);throw e;}
+}
+const tenant='00000000-0000-0000-0000-000000000000';
+const tenantB='88888888-8888-4888-8888-888888888888';
+const admin='11111111-1111-4111-8111-111111111111',finance='22222222-2222-4222-8222-222222222222',other='33333333-3333-4333-8333-333333333333',collector='44444444-4444-4444-8444-444444444444';
+await db.exec("insert into public.cobranca_tenants(id,name) values('"+tenantB+"','Outra empresa');");
+for(const [id,t,role] of [[admin,tenant,'admin'],[finance,tenant,'finance'],[other,tenantB,'admin'],[collector,tenant,'collector']]){
+ await db.exec("insert into auth.users(id,email,email_confirmed_at) values('"+id+"','"+id+"@example.invalid',now());insert into public.cobranca_profiles(id,tenant_id,name,role,discount_limit) values('"+id+"','"+t+"','Equipe','"+role+"',100);");
+}
+const as=async id=>db.exec("reset role;set test.uid='"+id+"';set role authenticated;");
+const rpc=async(action,payload={})=>(await db.query('select public.cobranca_app($1,$2) result',[action,JSON.stringify(payload)])).rows[0].result;
+
+const joint=async(action,payload={})=>(await db.query('select public.cobranca_negotiate($1,$2) result',[action,JSON.stringify(payload)])).rows[0].result;
+await as(admin);const c=(await rpc('save',{entity:'creditors',name:'Credor conjunto',fee_percent:'0'})).id;const b=(await rpc('save',{entity:'debtors',name:'Empresa conjunta',document:'12345678000190',creditor_id:c})).id;
+let sequence=0;const create=async(amount,extra={})=>(await rpc('new_process',{creditor_id:c,debtor_id:b,assigned_to:collector,external_ref:'CAL-'+(++sequence)+'-'+amount,original_amount:amount,due_date:'2026-01-01',interest_percent:'0',fine_percent:'0',...extra})).id;
+
+const cases=[...['monthly','daily','weekly','fortnightly','every20days','bimonthly','quarterly','semiannual','annual'].map(payment_frequency=>({payment_frequency})),...['days','weeks','months'].map(interval_unit=>({payment_frequency:'custom',interval_count:'3',interval_unit})),{payment_frequency:'free',due_dates:['2028-01-31','2028-02-10','2028-03-27','2028-04-15']}];
+for(const option of cases){const ids=[await create('100.03'),await create('200.08')],q=await joint('quote',{ids});const proposal={ids,discount_percent:'3.25',down_payment:'17.03',down_payment_due_date:'2028-01-20',installments:'4',first_due_date:'2028-01-31',reason:'Teste isolado de calendário',expected_snapshot:q.snapshot,...option};const simulation=simulateNegotiation(q,proposal,100);const before=(await rpc('detail',{id:ids[0]})).agreements.length;assert.equal(before,0);await assert.rejects(()=>joint('formalize',{...proposal,down_payment_due_date:proposal.first_due_date}));await assert.rejects(()=>joint('formalize',{...proposal,down_payment_due_date:'2028-02-01'}));const result=await joint('formalize',proposal);assert.deepEqual(result.schedule.map(x=>x.due_date),simulation.schedule.map(x=>x.due_date));for(let i=0;i<result.schedule.length;i++)assert.equal(Number(result.schedule[i].amount),Number(simulation.schedule[i].amount));let sum=0;for(const id of ids){const detail=await rpc('detail',{id});assert.deepEqual(detail.process.metadata.agreement_due_dates,simulation.schedule.filter(x=>x.number>0).map(x=>x.due_date));assert.equal(detail.agreements.length,1);assert.ok(detail.installments.filter(x=>x.installment_number===0).every(x=>x.due_date==='2028-01-20'));const recovered=(await db.query('select public.cobranca_agreement_statement($1) result',[JSON.stringify({id:detail.agreements[0].id})])).rows[0].result;assert.deepEqual(recovered.simulation.schedule.map(x=>x.due_date),simulation.schedule.map(x=>x.due_date));sum+=detail.installments.reduce((n,x)=>n+Math.round(Number(x.amount)*100),0);}assert.equal(sum,Math.round(Number(simulation.total)*100));await assert.rejects(()=>joint('formalize',proposal));}
+const ids=[await create('20')],q=await joint('quote',{ids}),proposal={ids,discount_percent:'0',down_payment:'0',installments:'2',first_due_date:'2028-01-31',reason:'Teste inválido',expected_snapshot:q.snapshot};for(const option of [{payment_frequency:'custom',interval_count:'0',interval_unit:'days'},{payment_frequency:'custom',interval_count:'1.5',interval_unit:'months'},{payment_frequency:'free',due_dates:['2028-01-31','2028-01-31']},{payment_frequency:'free',due_dates:['2028-01-31','2028-01-30']},{payment_frequency:'free',due_dates:['2028-01-31','2028-02-30']},{payment_frequency:'free'},{payment_frequency:'cash'}])await assert.rejects(()=>joint('formalize',{...proposal,...option}));assert.equal((await rpc('detail',{id:ids[0]})).agreements.length,0);await as(other);await assert.rejects(()=>joint('formalize',proposal));await db.exec('reset role;set role anon');await assert.rejects(()=>joint('formalize',proposal));console.log('PASS calendário: 12 recorrências, datas individuais persistidas, centavos, entrada, alçada e isolamento preservados; duplicação e cronogramas inválidos bloqueados.');await db.close();
