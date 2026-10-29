@@ -7,11 +7,11 @@ export function dateParts(value){
 }
 export const isoDate=d=>d.toISOString().slice(0,10);
 export function monthlyDueDate(value,offset){const [y,m,d]=dateParts(value),first=new Date(Date.UTC(y,m-1+offset,1)),last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0));if(first.getUTCFullYear()<1900||first.getUTCFullYear()>9999)throw Error('Data fora do intervalo permitido.');return isoDate(new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth(),Math.min(d,last.getUTCDate()))));}
-export const paymentFrequencyLabels={monthly:'Mensal',cash:'À vista',daily:'Diário (a cada dia)',weekly:'Semanal (a cada 7 dias)',fortnightly:'Quinzenal (a cada 15 dias)',bimonthly:'Bimestral',quarterly:'Trimestral',semiannual:'Semestral',annual:'Anual',custom:'Personalizado',free:'Datas livres'};
+export const paymentFrequencyLabels={monthly:'Mensal',cash:'À vista',daily:'Diário (a cada dia)',weekly:'Semanal (a cada 7 dias)',fortnightly:'Quinzenal (a cada 15 dias)',every20days:'A cada 20 dias',bimonthly:'Bimestral',quarterly:'Trimestral',semiannual:'Semestral',annual:'Anual',custom:'Personalizado',free:'Datas livres'};
 export function recurrence(proposal){
  const frequency=proposal.payment_frequency??'monthly';if(!Object.hasOwn(paymentFrequencyLabels,frequency))throw Error('Selecione uma periodicidade válida.');
  if(frequency==='custom'){const n=Number(proposal.interval_count),unit=proposal.interval_unit;if(!Number.isInteger(n)||n<1||n>3660||!['days','weeks','months'].includes(unit))throw Error('Informe um intervalo inteiro de 1 a 3660 e sua unidade.');return {frequency,count:n,unit};}
- const days={daily:1,weekly:7,fortnightly:15},months={monthly:1,bimonthly:2,quarterly:3,semiannual:6,annual:12,cash:1,free:1};return {frequency,count:days[frequency]||months[frequency],unit:days[frequency]?'days':'months'};
+ const days={daily:1,weekly:7,fortnightly:15,every20days:20},months={monthly:1,bimonthly:2,quarterly:3,semiannual:6,annual:12,cash:1,free:1};return {frequency,count:days[frequency]||months[frequency],unit:days[frequency]?'days':'months'};
 }
 export function installmentDueDate(value,offset,frequency='monthly',options={}){
  const rule=recurrence({...options,payment_frequency:frequency});if(!Number.isInteger(offset)||offset<0)throw Error('Parcela inválida.');
@@ -20,6 +20,7 @@ export function installmentDueDate(value,offset,frequency='monthly',options={}){
 }
 export function proposalDates(proposal,count){
  const rule=recurrence(proposal);dateParts(proposal.first_due_date);
+ if(Number(proposal.down_payment||0)>0&&proposal.down_payment_due_date!==undefined){dateParts(proposal.down_payment_due_date);if(proposal.first_due_date<=proposal.down_payment_due_date)throw Error('A primeira parcela deve vencer depois da entrada.');}
  if(rule.frequency==='cash'&&(count!==1||Number(proposal.down_payment||0)!==0))throw Error('À vista exige uma parcela e entrada zero.');
  let dates=proposal.due_dates;if(typeof dates==='string')try{dates=JSON.parse(dates);}catch{throw Error('Cronograma inválido.');}
  if(dates!==undefined&&dates!==null){if(!Array.isArray(dates)||dates.length!==count)throw Error('Confira os vencimentos de todas as parcelas.');dates.forEach(dateParts);if(dates[0]!==proposal.first_due_date)throw Error('O primeiro vencimento deve coincidir com a primeira parcela.');}
