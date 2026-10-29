@@ -36,3 +36,5 @@ export async function prospect(action,payload={}){await rpc('profile');return re
 export async function debtorContext(ids){await rpc('profile');return request('/rest/v1/rpc/cobranca_debtor_context',{method:'POST',body:JSON.stringify({payload:{ids}})});}
 
 export async function negotiate(action,payload={}){await rpc('profile');return request('/rest/v1/rpc/cobranca_negotiate',{method:'POST',body:JSON.stringify({action,payload})});}
+
+export async function financialEngine(action,payload={}){await rpc('profile');return request('/rest/v1/rpc/cobranca_financial_engine',{method:'POST',body:JSON.stringify({action,payload})});}

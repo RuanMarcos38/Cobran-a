@@ -45,3 +45,5 @@ jobs:
       - run: node tests/accepted-kanban.local.mjs
       - run: node tests/mail-query.local.mjs
 
+
+      - run: node tests/financial-engine.local.mjs
