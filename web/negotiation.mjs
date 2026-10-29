@@ -1,4 +1,4 @@
-import {openFinancialMemory} from './financial-engine.mjs';
+import {openFinancialMemories} from './financial-engine.mjs';
 import {financialStatement,statementQuote,statementText,statementNote,recordedMatches} from './negotiation-statement.mjs';
 import {createRateRecalculation} from './negotiation-rates.mjs';
 import {watchNegotiationQuote} from './negotiation-refresh.mjs';
@@ -49,7 +49,7 @@ export async function openNegotiation({api,modal,notify,guard,profile,refresh},i
   finalized={...simulated,formalized:true,reference:recorded.group_id||recorded.id||'',reason:data.reason};
   notify('Acordo formalizado: '+brl(simulated.total)+'. Parcelas registradas; nenhum recebimento foi lançado.');await refresh(id);}finally{quoteBusy=false;}
  });
- dialog.querySelector('[data-financial-memory]')?.addEventListener('click',()=>guard(()=>openFinancialMemory({api,modal,guard,profile},id)));
+ dialog.querySelector('[data-financial-memory]')?.addEventListener('click',()=>guard(()=>openFinancialMemories({api,modal,guard,profile},quote.items||[{id,reference:process.external_ref}])));
  dialog.classList.add('negotiation-dialog');const form=dialog.querySelector('form'),submit=form.querySelector('[type=submit]'),result=dialog.querySelector('[data-negotiation-result]'),error=dialog.querySelector('[data-negotiation-error]');submit.textContent='Formalizar acordo';
  dialog.addEventListener('close',()=>{if(!finalized||!canExportProposal(profile))return;const exported=modal('Acordo formalizado',`<p>Acordo registrado para ${esc(detail.debtor.name)}. Total: ${brl(finalized.total)}.</p><p>Baixe o registro com o demonstrativo e as parcelas. Este documento não comprova pagamento.</p><div class="toolbar"><button type="button" data-final-pdf>Baixar PDF do acordo</button><button type="button" data-final-xlsx>Baixar Excel do acordo</button></div>`,null);for(const format of ['pdf','xlsx'])exported.querySelector('[data-final-'+format+']').onclick=()=>guard(async()=>{const authorized=await authorizeProposalExport(api);downloadProposal(detail,quote,finalized,format,authorized);});},{once:true});
  const values=()=>({...Object.fromEntries(new FormData(form)),due_dates:manualDates});

@@ -23,6 +23,11 @@ export async function openFinancialMemory(ctx,id){
  for(const b of d.querySelectorAll('[data-memory-export]'))b.onclick=()=>guard(async()=>{const fresh=await api.rpc('profile');if(!['admin','master'].includes(fresh.role))throw Error('Exportação administrativa não autorizada');const saved=await api.financialEngine('memory',{id:m.calculation_id});if(!saved.quote.configured)throw Error('Regra incompleta: revise o contrato antes de exportar valores.');const rows=financialMemoryRows(saved),format=b.dataset.memoryExport;download(format==='pdf'?proposalPdf(rows):proposalXlsx(rows),format);});
  return d;
 }
+export async function openFinancialMemories(ctx,items){
+ if(items.length===1)return openFinancialMemory(ctx,items[0].id);
+ const d=ctx.modal('Memórias financeiras dos títulos','<p>Selecione o título. Cada memória corresponde ao saldo contratual oficial; a proposta conjunta permanece no demonstrativo do acordo.</p><div class="toolbar">'+items.map((item,i)=>'<button type="button" data-memory-item="'+i+'">'+esc(item.reference)+'</button>').join('')+'</div>',null);
+ d.querySelectorAll('[data-memory-item]').forEach(b=>b.onclick=()=>ctx.guard(()=>openFinancialMemory(ctx,items[Number(b.dataset.memoryItem)].id)));return d;
+}
 export async function openFinancialEngine(ctx){
  const {api,modal,guard,notify}=ctx;const profile=ctx.profile||await api.rpc('profile');ctx={...ctx,profile};
  const lookups=await api.rpc('lookups'),config=await api.financialEngine('list');
