@@ -62,3 +62,5 @@ html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table tbody td:las
 
 .negotiation-inputs{grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))}.negotiation-inputs select{width:100%;min-width:0}
 .negotiation-statement-note{font-size:12px;color:var(--muted);line-height:1.65;overflow-wrap:anywhere}.negotiation-review{background:var(--panel,#f1f4f8)}
+
+.financial-engine-view{grid-column:1/-1;min-width:0}.financial-engine-view .table-wrap{margin:14px 0;max-width:100%}.financial-engine-view p{line-height:1.5}
