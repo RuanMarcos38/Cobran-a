@@ -1,0 +1,107 @@
+{
+  "versao": 1,
+  "remetente": "cobranca@rrestrategiaperformance.com.br",
+  "responder_para": "cobranca@rrestrategiaperformance.com.br",
+  "status": "modelos preparados; integracao e envio nao ativados",
+  "modelos": [
+    {
+      "id": "primeiro_contato",
+      "nome": "Primeiro contato amigável",
+      "assunto": "Atendimento — {empresa_credora}",
+      "corpo": "Olá, {nome_devedor}.\n\nSomos a equipe da {empresa_cobradora}, responsável pelo atendimento de cobrança em nome de {empresa_credora}.\n\nReferência: {referencia}\nVencimento: {vencimento}\nValor atualizado em {data_atualizacao}: {valor_atualizado}\n\nQueremos ajudar você a conferir e regularizar essa pendência. Responda a este email para receber as opções disponíveis ou esclarecer qualquer dúvida.\n\nSe já realizou o pagamento ou não reconhece esta cobrança, responda a este email para conferência.\n\nAtenciosamente,\n{empresa_cobradora}\nEm nome de {empresa_credora}\ncobranca@rrestrategiaperformance.com.br",
+      "exige_aprovacao_juridica": false,
+      "campos_obrigatorios": [
+        "data_atualizacao",
+        "empresa_cobradora",
+        "empresa_credora",
+        "nome_devedor",
+        "referencia",
+        "valor_atualizado",
+        "vencimento"
+      ]
+    },
+    {
+      "id": "lembrete",
+      "nome": "Lembrete amigável",
+      "assunto": "Retorno sobre seu atendimento — {referencia}",
+      "corpo": "Olá, {nome_devedor}.\n\nSomos a equipe da {empresa_cobradora}, responsável pelo atendimento de cobrança em nome de {empresa_credora}.\n\nReferência: {referencia}\nVencimento: {vencimento}\nValor atualizado em {data_atualizacao}: {valor_atualizado}\n\nEstamos retomando nosso contato porque a pendência permanece em aberto nos registros consultados. Podemos verificar juntos a melhor forma de regularização? Se precisar de algum documento para conferência, é só nos informar.\n\nSe já realizou o pagamento ou não reconhece esta cobrança, responda a este email para conferência.\n\nAtenciosamente,\n{empresa_cobradora}\nEm nome de {empresa_credora}\ncobranca@rrestrategiaperformance.com.br",
+      "exige_aprovacao_juridica": false,
+      "campos_obrigatorios": [
+        "data_atualizacao",
+        "empresa_cobradora",
+        "empresa_credora",
+        "nome_devedor",
+        "referencia",
+        "valor_atualizado",
+        "vencimento"
+      ]
+    },
+    {
+      "id": "negociacao",
+      "nome": "Convite para negociação",
+      "assunto": "Podemos conversar? — {empresa_credora}",
+      "corpo": "Olá, {nome_devedor}.\n\nSomos a equipe da {empresa_cobradora}, responsável pelo atendimento de cobrança em nome de {empresa_credora}.\n\nReferência: {referencia}\nVencimento: {vencimento}\nValor atualizado em {data_atualizacao}: {valor_atualizado}\n\nSabemos que imprevistos acontecem. Caso não consiga quitar o valor neste momento, responda com uma proposta ou previsão de pagamento. Vamos consultar as condições autorizadas pela empresa credora, sem compromisso de aprovação antecipada.\n\nSe já realizou o pagamento ou não reconhece esta cobrança, responda a este email para conferência.\n\nAtenciosamente,\n{empresa_cobradora}\nEm nome de {empresa_credora}\ncobranca@rrestrategiaperformance.com.br",
+      "exige_aprovacao_juridica": false,
+      "campos_obrigatorios": [
+        "data_atualizacao",
+        "empresa_cobradora",
+        "empresa_credora",
+        "nome_devedor",
+        "referencia",
+        "valor_atualizado",
+        "vencimento"
+      ]
+    },
+    {
+      "id": "prazo_acordado",
+      "nome": "Retorno na data combinada",
+      "assunto": "Retorno combinado — {referencia}",
+      "corpo": "Olá, {nome_devedor}.\n\nSomos a equipe da {empresa_cobradora}, responsável pelo atendimento de cobrança em nome de {empresa_credora}.\n\nReferência: {referencia}\nVencimento: {vencimento}\nValor atualizado em {data_atualizacao}: {valor_atualizado}\n\nConforme nosso contato anterior, ficou combinado um retorno até {prazo_resposta}. Poderia nos atualizar sobre a previsão de regularização? Caso as condições tenham mudado, estamos disponíveis para conversar.\n\nSe já realizou o pagamento ou não reconhece esta cobrança, responda a este email para conferência.\n\nAtenciosamente,\n{empresa_cobradora}\nEm nome de {empresa_credora}\ncobranca@rrestrategiaperformance.com.br",
+      "exige_aprovacao_juridica": false,
+      "campos_obrigatorios": [
+        "data_atualizacao",
+        "empresa_cobradora",
+        "empresa_credora",
+        "nome_devedor",
+        "prazo_resposta",
+        "referencia",
+        "valor_atualizado",
+        "vencimento"
+      ]
+    },
+    {
+      "id": "extrajudicial",
+      "nome": "Comunicação extrajudicial",
+      "assunto": "Solicitação de retorno — {referencia}",
+      "corpo": "Olá, {nome_devedor}.\n\nSomos a equipe da {empresa_cobradora}, responsável pelo atendimento de cobrança em nome de {empresa_credora}.\n\nReferência: {referencia}\nVencimento: {vencimento}\nValor atualizado em {data_atualizacao}: {valor_atualizado}\n\nSolicitamos seu retorno até {prazo_resposta} para conferência da pendência e tentativa de solução amigável. Na ausência de solução, o caso poderá ser encaminhado para análise jurídica, conforme a documentação e as orientações da empresa credora. Esta comunicação não informa a existência de ação judicial.\n\nSe já realizou o pagamento ou não reconhece esta cobrança, responda a este email para conferência.\n\nAtenciosamente,\n{empresa_cobradora}\nEm nome de {empresa_credora}\ncobranca@rrestrategiaperformance.com.br",
+      "exige_aprovacao_juridica": false,
+      "campos_obrigatorios": [
+        "data_atualizacao",
+        "empresa_cobradora",
+        "empresa_credora",
+        "nome_devedor",
+        "prazo_resposta",
+        "referencia",
+        "valor_atualizado",
+        "vencimento"
+      ]
+    },
+    {
+      "id": "ajuizamento_aprovado",
+      "nome": "Ajuizamento aprovado pelo responsável jurídico",
+      "assunto": "Comunicação sobre encaminhamento jurídico — {referencia}",
+      "corpo": "Olá, {nome_devedor}.\n\nSomos a equipe da {empresa_cobradora}, responsável pelo atendimento de cobrança em nome de {empresa_credora}.\n\nReferência: {referencia}\nVencimento: {vencimento}\nValor atualizado em {data_atualizacao}: {valor_atualizado}\n\nApós análise da documentação e autorização da empresa credora, foi aprovado o ajuizamento da cobrança referente à obrigação acima. A dívida será submetida à cobrança judicial conforme orientação do responsável jurídico. Até {prazo_resposta}, permanecemos disponíveis para avaliar uma solução consensual.\n\nEsta mensagem não é uma citação judicial e não informa que a ação já foi protocolada.\n\nSe já realizou o pagamento ou não reconhece esta cobrança, responda a este email para conferência.\n\nAtenciosamente,\n{empresa_cobradora}\nEm nome de {empresa_credora}\ncobranca@rrestrategiaperformance.com.br",
+      "exige_aprovacao_juridica": true,
+      "campos_obrigatorios": [
+        "data_atualizacao",
+        "empresa_cobradora",
+        "empresa_credora",
+        "nome_devedor",
+        "prazo_resposta",
+        "referencia",
+        "valor_atualizado",
+        "vencimento"
+      ]
+    }
+  ]
+}

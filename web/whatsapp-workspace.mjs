@@ -1,0 +1,35 @@
+const svg=path=>`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
+export const waIcons={plus:svg('M12 5v14M5 12h14'),newChat:svg('M14 5H5v14h14v-9M15 3h6v6M21 3l-10 10'),search:svg('M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0'),back:svg('m14 6-6 6 6 6'),lock:svg('M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5Z')};
+export function whatsappPhone(value){const n=String(value||'').replace(/\D/g,'');return /^55\d{10,11}$/.test(n)?`+55 (${n.slice(2,4)}) ${n.slice(4,-4)}-${n.slice(-4)}`:String(value||'');}
+export function chatPreview(message,address){if(!message)return address||'';const prefix=message.direction==='note'?'Nota interna: ':message.direction==='outbound'?'Você: ':'';return prefix+String(message.content||'[Anexo]').replace(/\s+/g,' ').slice(0,120);}
+export function installWhatsappWorkspace(root){
+ root.classList.add('wa-workspace');const header=root.querySelector('.attendance-list>header'),title=root.querySelector('[data-channel-title]'),heading=document.createElement('div');heading.className='wa-heading';title.before(heading);heading.append(title);const identity=document.createElement('small');identity.dataset.waIdentity='';heading.append(identity);
+ const more=root.querySelector('.attendance-options');more.querySelector('summary').setAttribute('aria-label','Opções do WhatsApp');
+ const account=root.querySelector('.attendance-account');more.querySelector('div').prepend(account);
+ account.querySelector('select').addEventListener('change',()=>more.removeAttribute('open'));
+ for(const key of ['sync','connection']){const b=root.querySelector('[data-'+key+']');more.querySelector('div').append(b);}
+ const newChat=root.querySelector('[data-new]');newChat.innerHTML=waIcons.newChat;newChat.title='Nova conversa';
+ const search=root.querySelector('[data-search]'),wrapper=document.createElement('div');wrapper.className='wa-search';search.before(wrapper);wrapper.innerHTML=waIcons.search;wrapper.append(search);search.placeholder='Pesquisar ou começar uma nova conversa';
+ root.querySelector('[data-inbox]').textContent='Todas';root.querySelector('.attendance-filters').insertAdjacentHTML('beforeend','<span class="wa-list-caption">Conversas desta conta</span>');
+ root.querySelectorAll('[data-config]').forEach(b=>{b.innerHTML='Configurar conta';});root.querySelector('[data-access]')?.replaceChildren(document.createTextNode('Permissões e atendentes'));
+ const menu=more.querySelector('div');menu.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>more.removeAttribute('open')));
+}
+export function updateWhatsappIdentity(root,account,sector){
+ if(!root.classList.contains('wa-workspace'))return;
+ root.querySelector('[data-channel-title]').textContent='Conversas';const text=root.querySelector('[data-wa-identity]');text.textContent=(sector==='commercial'?'Comercial':'Cobrança')+(account?' · '+whatsappPhone(account.address):' · Sem conta configurada');
+}
+export function whatsappWelcome(root,account,sector){
+ if(!root.classList.contains('wa-workspace'))return;
+ root.classList.remove('wa-reading');root.querySelector('.attendance-pane').innerHTML=`<div class="wa-welcome"><svg class="wa-welcome-art" viewBox="0 0 300 180" aria-hidden="true"><rect x="38" y="24" width="224" height="130" rx="12" fill="#e9edef"/><rect x="47" y="33" width="206" height="108" rx="5" fill="#fff"/><path d="M22 154h256l-18 12H40Z" fill="#d3dbde"/><rect x="67" y="55" width="101" height="32" rx="10" fill="#d9fdd3"/><path d="m75 82-6 10 20-7" fill="#d9fdd3"/><path d="M79 66h70M79 74h48" stroke="#69a48a" stroke-width="3" stroke-linecap="round"/><rect x="130" y="99" width="103" height="25" rx="9" fill="#edf2f4"/><path d="M143 111h72" stroke="#a8b8bf" stroke-width="3" stroke-linecap="round"/></svg><h2>WhatsApp ${sector==='commercial'?'Comercial':'da Cobrança'}</h2><p>${account?'Selecione uma conversa para começar o atendimento.':'Cadastre uma conta nas opções do WhatsApp.'}</p><small>Envie mensagens, documentos e áudios pela conta do seu setor.</small><span class="wa-account-hint">Contas e conversas acessíveis conforme suas permissões.</span></div>`;
+}
+export function decorateWhatsappConversation(root){
+ root.classList.add('wa-reading');const pane=root.querySelector('.attendance-pane'),header=pane.querySelector('.attendance-header'),back=document.createElement('button');back.type='button';back.className='wa-back';back.setAttribute('aria-label','Voltar às conversas');back.innerHTML=waIcons.back;back.onclick=()=>root.classList.remove('wa-reading');header.prepend(back);
+ const address=header.querySelector('small');const parts=address.textContent.split(' · ');parts[0]=whatsappPhone(parts[0]);address.textContent=parts.join(' · ');
+ const menu=document.createElement('details');menu.className='wa-conversation-options';menu.innerHTML='<summary aria-label="Opções da conversa">⋮</summary><div></div>';for(const b of header.querySelectorAll('[data-qr],[data-assign],[data-refresh]'))menu.querySelector('div').append(b);header.append(menu);menu.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>menu.removeAttribute('open')));
+ const form=pane.querySelector('form'),actions=form.querySelector('.attendance-compose-actions'),options=document.createElement('details');options.className='wa-compose-options';options.innerHTML='<summary aria-label="Anexos e nota interna">'+waIcons.plus+'</summary><div></div>';actions.prepend(options);for(const el of actions.querySelectorAll('.attendance-attach,label:has([name=note])'))options.querySelector('div').append(el);
+ let day;for(const message of pane.querySelectorAll('.attendance-message')){const footer=message.querySelector('footer'),stamp=footer.firstChild.textContent,parts=stamp.match(/^(\d{2}\/\d{2}),\s*(\d{2}:\d{2})/);if(parts){if(day!==parts[1]){day=parts[1];const divider=document.createElement('div');divider.className='wa-day';divider.textContent=day;message.before(divider);}footer.firstChild.textContent=parts[2]+' ';}const label=footer.querySelector('span');label.title=label.textContent;label.setAttribute('aria-label',label.textContent);label.textContent=message.classList.contains('note')?'Interna':label.textContent.includes('✓')?'✓':/Sem confirmação|pendente|não enviada/.test(label.textContent)?'⚠':'';}
+ const attachment=options.querySelector('.attendance-attach');attachment.firstChild.textContent='Anexar arquivo';
+ const text=form.querySelector('textarea'),send=form.querySelector('[type=submit]'),mic=form.querySelector('[data-record]');text.placeholder='Digite uma mensagem';text.rows=1;
+ const toggle=()=>{const content=text.value.trim()||form.querySelector('[data-file-name]').textContent;send.hidden=!content;mic.hidden=!!content;};text.addEventListener('input',toggle);form.addEventListener('change',toggle);toggle();
+}
+export function whatsappAttachmentReady(root){if(!root.classList.contains('wa-workspace'))return;const form=root.querySelector('.attendance-composer');form.querySelector('[type=submit]').hidden=false;form.querySelector('[data-record]').hidden=true;}
