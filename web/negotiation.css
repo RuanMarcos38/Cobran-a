@@ -64,3 +64,11 @@ html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table tbody td:las
 .negotiation-statement-note{font-size:12px;color:var(--muted);line-height:1.65;overflow-wrap:anywhere}.negotiation-review{background:var(--panel,#f1f4f8)}
 
 .financial-engine-view{grid-column:1/-1;min-width:0}.financial-engine-view .table-wrap{margin:14px 0;max-width:100%}.financial-engine-view p{line-height:1.5}
+
+/* Editable payments: minimal scope, preserve existing CRM theme. */
+.negotiation-schedule-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0}
+.negotiation-schedule-tools [aria-pressed=true]{border-color:var(--primary,#1766b5);color:var(--primary,#1766b5);font-weight:700}
+.negotiation [data-negotiation-result] [data-payment-amount]{min-width:120px;width:100%;text-align:right;font-variant-numeric:tabular-nums}
+.negotiation [data-negotiation-result] [data-entry-date-input],.negotiation [data-negotiation-result] [data-installment-date]{min-width:155px}
+.negotiation-total-check{padding:12px;border:1px solid var(--line,#dce4ee);border-radius:6px;line-height:1.65;font-variant-numeric:tabular-nums}
+@media(max-width:700px){.negotiation-schedule-tools{align-items:stretch}.negotiation-schedule-tools button{flex:1 1 160px}}
