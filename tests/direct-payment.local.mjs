@@ -25,7 +25,7 @@ const joint=async(action,payload={})=>(await db.query('select public.cobranca_ne
 await as(admin);
 const c=(await rpc('save',{entity:'creditors',name:'Credor Pagamento Direto',financial_mode:'none',default_interest:'0',default_fine:'0',grace_days:'0',fee_percent:'10',direct_payment_contract_rate:'5'})).id;
 const b=(await rpc('save',{entity:'debtors',name:'Devedor Pagamento Direto',document:'12345678000190',creditor_id:c})).id;
-const create=async(label,amount)=>(await rpc('new_process',{creditor_id:c,debtor_id:b,external_ref:label,original_amount:amount,due_date:'2026-01-01',interest_percent:'0',fine_percent:'0'})).id;
+const create=async(label,amount)=>(await rpc('new_process',{creditor_id:c,debtor_id:b,external_ref:label,assigned_to:admin,original_amount:amount,due_date:'2026-01-01',interest_percent:'0',fine_percent:'0'})).id;
 const ids=[await create('DIRETO','1000.00'),await create('NORMAL','2000.00')];
 const standard=await joint('quote',{ids});
 const direct=await joint('quote',{ids,direct_payment_ids:[ids[0]]});
@@ -55,7 +55,7 @@ assert.equal(detail.receipts?.length||0,0);
 await assert.rejects(()=>joint('formalize',proposal));
 const unconfigured=(await rpc('save',{entity:'creditors',name:'Sem taxa direta',fee_percent:'0'})).id;
 const devedor=(await rpc('save',{entity:'debtors',name:'Sem taxa',document:'12345678000191',creditor_id:unconfigured})).id;
-const blocked=(await rpc('new_process',{creditor_id:unconfigured,debtor_id:devedor,external_ref:'SEM-TAXA',original_amount:'100',due_date:'2026-01-01',interest_percent:'0',fine_percent:'0'})).id;
+const blocked=(await rpc('new_process',{creditor_id:unconfigured,debtor_id:devedor,external_ref:'SEM-TAXA',assigned_to:admin,original_amount:'100',due_date:'2026-01-01',interest_percent:'0',fine_percent:'0'})).id;
 await assert.rejects(()=>joint('quote',{ids:[blocked],direct_payment_ids:[blocked]}),/taxa contratual/i);
 console.log('PASS direct-payment local: per-title rate, mixed quote, overdue days, immutable receipts, authorization, exact cents, and missing rate block.');
 await db.close();
