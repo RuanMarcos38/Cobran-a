@@ -24,6 +24,7 @@ jobs:
       - run: node tests/attendance.local.mjs
       - run: node tests/negotiation.local.mjs
       - run: node tests/joint-negotiation.local.mjs
+      - run: node tests/direct-payment.local.mjs
       - run: node tests/scheduling.local.mjs
       - run: node --check web/app.mjs && node --check server.mjs
 
