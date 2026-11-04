@@ -37,7 +37,7 @@ assert.equal(Number(direct.items.find(x=>x.id===ids[0]).quote.fees),0);
 assert.equal(Number(direct.total),3250);
 assert.equal(Number(standard.total),3300);
 assert.equal(direct.items.find(x=>x.id===ids[1]).quote.payment_mode,undefined);
-assert.equal(Number((await db.query("select (cobranca_private.financial_quote(d)->>'days_in_arrears')::int days from public.cobranca_debts d where d.id=$1",[ids[0]])).rows[0].days)>0,true);
+assert.equal(direct.items.find(x=>x.id===ids[0]).quote.days_in_arrears>0,true);
 const proposal={ids,direct_payment_ids:[ids[0]],discount_percent:'0',down_payment:'0',installments:'2',first_due_date:'2027-01-10',reason:'Teste autorizado em banco local',payment_amounts:['1000.00','2250.00'],expected_snapshot:direct.snapshot};
 const sim=simulateNegotiation(direct,proposal,100);
 assert.equal(financialStatement(direct,sim).total,sim.total);
