@@ -1,4 +1,4 @@
--- Optional per-installment amounts; existing automatic clients remain compatible.
+-- Optional per-installment amounts. Apply only after staging validation.
 begin;
 set local lock_timeout='5s';
 CREATE OR REPLACE FUNCTION cobranca_private.joint_negotiation(action text, payload jsonb)
@@ -69,7 +69,13 @@ begin
   if jsonb_typeof(payload->'payment_amounts')<>'array' or jsonb_array_length(payload->'payment_amounts')<>count_parts then raise exception 'Quantidade de valores das parcelas inválida';end if;
   manual_amounts:='{}';
   for raw_amount in select jsonb_array_elements_text(payload->'payment_amounts') loop
-   if raw_amount !~ '^[0-9]+(\.[0-9]{1,2})?
+   if raw_amount !~ '^[0-9]+(\.[0-9]{1,2})?$' then raise exception 'Valor de parcela inválido';end if;
+   if raw_amount::numeric<=0 or raw_amount::numeric>999999999999.99 then raise exception 'Valor de parcela fora do limite';end if;
+   payment:=round(raw_amount::numeric*100)::bigint;
+   manual_amounts:=array_append(manual_amounts,payment);
+   manual_total:=manual_total+payment;
+  end loop;
+ end if;
  entry_due:=coalesce(nullif(payload->>'down_payment_due_date','')::date,due);
 
  if discount is null or discount<0 or discount>least(p.discount_limit,100) then raise exception 'Desconto acima da alçada';end if;
@@ -122,87 +128,6 @@ begin
   payment_due:=due_dates[part];
 
   payment:=case when manual_amounts is not null then manual_amounts[part] else (total_c-entry_c)/count_parts+case when part<=(total_c-entry_c)%count_parts then 1 else 0 end end;
-
-  capacity:=0;prev_capacity:=0;previous_allocated:=0;
-
-  for idx in 1..cardinality(ids) loop
-
-   capacity:=capacity+remains[idx];allocated:=round(capacity::numeric*payment/remaining_sum);piece:=allocated-previous_allocated;previous_allocated:=allocated;
-
-   if piece>0 then insert into public.cobranca_agreement_installments(agreement_id,installment_number,amount,due_date) values(agreements[idx],part,piece/100.0,payment_due);end if;
-
-   remains[idx]:=remains[idx]-piece;
-
-  end loop;
-
-  remaining_sum:=remaining_sum-payment;
-
-  schedule:=schedule||jsonb_build_array(jsonb_build_object('number',part,'amount',payment/100.0,'due_date',payment_due));
-
- end loop;
-
- return jsonb_build_object('group_id',group_id,'total',total_c/100.0,'agreements',to_jsonb(agreements),'schedule',schedule,'payment_frequency',frequency);
-
-end$function$
-;
- then raise exception 'Valor de parcela inválido';end if;
-   if raw_amount::numeric<=0 or raw_amount::numeric>999999999999.99 then raise exception 'Valor de parcela fora do limite';end if;
-   payment:=round(raw_amount::numeric*100)::bigint;
-   manual_amounts:=array_append(manual_amounts,payment);
-   manual_total:=manual_total+payment;
-  end loop;
- end if;
- entry_due:=coalesce(nullif(payload->>'down_payment_due_date','')::date,due);
-
- if discount is null or discount<0 or discount>least(p.discount_limit,100) then raise exception 'Desconto acima da alçada';end if;
-
- total_c:=round(base*(1-discount/100),2)*100;
-
- if total_c/100.0 < round(contract_base*(1-least(p.discount_limit,100)/100),2) then raise exception 'Redução dos encargos e desconto acima da sua alçada';end if;
-
- if entry_c is null or entry_c<0 or entry_c>=total_c or count_parts is null or count_parts not between 1 and 120 or total_c-entry_c<count_parts or due is null or due<current_date or reason='' or length(reason)>2000 then raise exception 'Entrada, parcelas, vencimento ou aceite inválidos';end if;
-
- -- Cumulative proportional rounding guarantees that title totals equal the single proposal.
-
- idx:=0;
-
- for item in select value from jsonb_array_elements(items) loop
-
-  idx:=idx+1;weights:=weights+(item->'quote'->>'total')::numeric;
-
-  allocated:=round(weights*total_c/base);own_total:=allocated-previous_allocated;previous_allocated:=allocated;
-
-  if own_total<=0 then raise exception 'Desconto deixa título sem valor. Reduza o desconto';end if;
-
-  own_entry:=round(allocated::numeric*entry_c/total_c)-entry_alloc;entry_alloc:=entry_alloc+own_entry;own_remaining:=own_total-own_entry;
-
-  totals:=array_append(totals,own_total);entries:=array_append(entries,own_entry);remains:=array_append(remains,own_remaining);
-
-  select * into d from public.cobranca_debts where id=(item->>'id')::uuid;
-
-  insert into public.cobranca_agreements(tenant_id,debt_id,debtor_id,status,total_amount,down_payment,installments,first_due_date,notes,created_by,financial_snapshot)
-
-  values(p.tenant_id,d.id,d.debtor_id,'active',own_total/100.0,own_entry/100.0,count_parts,due,reason||E'\nPeriodicidade: '||frequency||E'\nNegociação conjunta: '||group_id::text,p.id::text,jsonb_build_object('down_payment_due_date',entry_due,'version',1,'quote',item->'quote','as_of',current_date,'group_id',group_id,'payment_frequency',frequency,'recurrence',jsonb_build_object('interval_count',payload->'interval_count','interval_unit',payload->'interval_unit'),'reference',d.external_ref,'original_amount',d.original_amount,'creditor_name',(select name from public.cobranca_creditors where id=d.creditor_id),'debtor_name',(select name from public.cobranca_debtors where id=d.debtor_id))) returning * into a;
-
-  agreements:=array_append(agreements,a.id);
-
-  if own_entry>0 then insert into public.cobranca_agreement_installments(agreement_id,installment_number,amount,due_date) values(a.id,0,own_entry/100.0,entry_due);end if;
-
-  update public.cobranca_debts set current_amount=own_total/100.0,status='agreement',app_status='Acordo formalizado',metadata=metadata||jsonb_build_object('financial_frozen',true,'agreement_quote',item->'quote','agreement_group_id',group_id,'agreement_group_total',total_c/100.0,'agreement_payment_frequency',frequency,'agreement_recurrence',jsonb_build_object('frequency',frequency,'interval_count',payload->'interval_count','interval_unit',payload->'interval_unit'),'agreement_due_dates',to_jsonb(due_dates)) where id=d.id;
-
-  insert into public.cobranca_interaction_logs(tenant_id,creditor_id,debtor_id,debt_id,channel,direction,subject,content,payload) values(p.tenant_id,d.creditor_id,d.debtor_id,d.id,'negotiation','internal','Negociação conjunta',reason,jsonb_build_object('actor',p.id,'group_id',group_id,'payment_frequency',frequency,'due_dates',to_jsonb(due_dates),'interval_count',payload->'interval_count','interval_unit',payload->'interval_unit'));
-
- end loop;
-
- if entry_c>0 then schedule:=schedule||jsonb_build_array(jsonb_build_object('number',0,'amount',entry_c/100.0,'due_date',entry_due));end if;
-
- remaining_sum:=total_c-entry_c;
-
- for part in 1..count_parts loop
-
-  payment_due:=due_dates[part];
-
-  payment:=(total_c-entry_c)/count_parts+case when part<=(total_c-entry_c)%count_parts then 1 else 0 end;
 
   capacity:=0;prev_capacity:=0;previous_allocated:=0;
 
