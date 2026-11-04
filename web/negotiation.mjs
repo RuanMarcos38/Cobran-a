@@ -100,6 +100,7 @@ export async function openNegotiation({api,modal,notify,guard,profile,refresh,op
  result.addEventListener('change',e=>{
   if(e.target.hasAttribute('data-entry-date-input')){form.elements.down_payment_due_date.value=e.target.value;form.elements.down_payment_due_date.dispatchEvent(new Event('calendar-sync'));form.elements.accepted.checked=false;draw();return;}
   if(e.target.hasAttribute('data-payment-amount')){
+   try{if(cents(e.target.value)<=0n)throw Error('A parcela deve ser maior que zero.');}catch(err){error.textContent=err.message;submit.disabled=true;return;}
    const n=Number(e.target.dataset.paymentAmount);if(n===0){form.elements.down_payment.value=e.target.value;customAmounts=lastSimulation?.schedule.filter(p=>p.number>0).map(p=>p.amount)||customAmounts;}
    else if(customAmounts){customAmounts[n-1]=e.target.value;}
    form.elements.accepted.checked=false;draw();
