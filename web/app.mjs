@@ -75,7 +75,7 @@ function renderProcesses(){ $('#content').innerHTML=`<div class="toolbar">${butt
 const emailTools=()=>({api,modal,notify,guard,refresh:async()=>{if(state.detail)state.detail=await api.rpc('detail',{id:state.detail.process.id});}});
 function renderDetail(){if(!state.detail)return '<div class="empty"><strong>Selecione um processo na aba Pesquisa.</strong></div>';const d=state.detail;
   if(state.tab===1)return `<div class="panel"><h3>Cliente credor</h3>${details(d.creditor)}${button('client-processes','Consultar carteira','search')}</div>`;
-  if(state.tab===2)return `<div class="panel"><h3>Processo ${esc(d.process.external_ref)}</h3>${details(d.process)}${financialSummary(d.financial)}<div class="toolbar">${['admin','master','supervisor','collector','finance'].includes(state.profile.role)?button('email-send','Enviar cobrança por email','file')+button('email-history','Histórico de emails','file'):''}${button('contract','Regra do contrato','file')}${button('status','Alterar situação','refresh')}${button('history','Registrar atendimento','plus')}${button('agreement','Negociar / formalizar acordo','money')}${button('payment','Registrar recebimento','money')}${button('document','Adicionar documento','file')}${button('receipts','Recebimentos / estorno','money')}</div><h3>Títulos e acordos</h3>${details(d.agreements)}${['admin','master','supervisor','collector','finance'].includes(state.profile.role)?d.agreements.map(a=>button('agreement-statement:'+a.id,'Demonstrativo do acordo '+a.id,'file')).join(''):''}<h3>Parcelas</h3>${plainTable(d.installments)}</div>`;
+  if(state.tab===2)return `<div class="panel"><h3>Processo ${esc(d.process.external_ref)}</h3>${details(d.process)}${financialSummary(d.financial)}<div class="toolbar">${['admin','master','supervisor','collector','finance'].includes(state.profile.role)?button('email-send','Enviar cobrança por email','file')+button('email-history','Histórico de emails','file'):''}${button('contract','Regra do contrato','file')}${['admin','master'].includes(state.profile.role)?button('title-grace','Carência do título','file'):''}${button('status','Alterar situação','refresh')}${button('history','Registrar atendimento','plus')}${button('agreement','Negociar / formalizar acordo','money')}${button('payment','Registrar recebimento','money')}${button('document','Adicionar documento','file')}${button('receipts','Recebimentos / estorno','money')}</div><h3>Títulos e acordos</h3>${details(d.agreements)}${['admin','master','supervisor','collector','finance'].includes(state.profile.role)?d.agreements.map(a=>button('agreement-statement:'+a.id,'Demonstrativo do acordo '+a.id,'file')).join(''):''}<h3>Parcelas</h3>${plainTable(d.installments)}</div>`;
   if(state.tab===4)return `<div class="panel">${button('document','Adicionar documento','plus')}<div class="history">${d.documents.map(r=>`<article><strong>${esc(r.name)}</strong> ${button('download:'+r.id,'Baixar','export')}<small>${esc(r.created_at)}</small></article>`).join('')||'Nenhum documento anexado.'}</div></div>`;
   const logs=state.tab===5?d.history.filter(x=>x.channel==='voice'):d.history;
   return `<div class="panel">${button('history','Registrar atendimento','plus')}<div class="history">${logs.map(r=>`<article><strong>${esc(r.subject||r.channel)}</strong><small>${esc(r.created_at)} · ${esc(r.operator_name||'Sistema')}</small><p>${esc(r.content)}</p></article>`).join('')||'Nenhum atendimento registrado.'}</div></div>`;
@@ -194,6 +194,34 @@ async function action(id){if(id==='toggle-filters'){const form=$('#filters'),exp
  }
  if(id==='distribute'){if(!state.selected.size)throw Error('Selecione os processos que deseja distribuir.');modal('Distribuir por empresa devedora','<p>Todos os títulos abertos das empresas devedoras selecionadas serão atribuídos ao mesmo cobrador, inclusive em outras páginas e credores. Títulos encerrados serão preservados.</p>'+select('assigned_to','Cobrador',state.lookups.users)+input('reason','Motivo'),data=>api.rpc('distribute',{...data,ids:[...state.selected]}));return;}
  const d=state.detail;if(!d)throw Error('Selecione um processo.');const process=d.process;
+ if(id==='title-grace'){
+  if(!['admin','master'].includes(state.profile.role))throw Error('Somente o administrador pode configurar a carência por título.');
+  const previous=process.metadata?.title_grace||{};
+  const terms=d.financial?.terms||{};
+  const initial=previous.selection||'inherit';
+  const titleInfo='<p>Vencimento original: <strong>'+esc((process.due_date||'').split('-').reverse().join('/'))+'</strong> (não será alterado).</p>'+
+   '<p>Carência em uso: <strong>'+esc(terms.grace_days??0)+' dias</strong>. A configuração afeta apenas a regra de carência deste título; taxas e base de honorários continuam vinculadas ao contrato.</p>'+
+   '<p>Não é permitido alterar títulos com pagamentos, acordos ou saldo financeiro encerrado. Alterações são auditadas e os registros anteriores permanecem preservados.</p>';
+  const dialog=modal('Carência individual do título',titleInfo+
+   select('selection','Modalidade da carência',[
+    {id:'inherit',name:'Herdar carência do credor / contrato'},
+    {id:'custom',name:'Carência personalizada para este título'},
+    {id:'none',name:'Sem carência (zero dias)'}
+   ],initial)+input('days','Dias de carência personalizada','number',previous.days??terms.grace_days??0,false)+input('reason','Justificativa da alteração','text','',true),
+   async data=>{
+    if(!['inherit','custom','none'].includes(data.selection))throw Error('Modalidade inválida.');
+    if(data.selection==='custom'&&(!/^\\d{1,4}$/.test(String(data.days))||Number(data.days)>3650))throw Error('Informe de 0 a 3650 dias.');
+    if(String(data.reason||'').trim().length<10)throw Error('Justifique a alteração (mínimo 10 caracteres).');
+    const result=await api.rpc('title_grace',{id:process.id,selection:data.selection,days:data.days,reason:data.reason});
+    if(result.due_date!==process.due_date)throw Error('O vencimento original foi alterado inesperadamente. Solicite conferência.');
+    state.detail=await api.rpc('detail',{id:process.id});
+    notify('Carência atualizada. Vencimento original preservado; confira a nova memória de cálculo.');
+   });
+  const selection=dialog.querySelector('[name=selection]'),days=dialog.querySelector('[name=days]');
+  function changeMode(){days.closest('label').hidden=selection.value!=='custom';days.required=selection.value==='custom';days.max='3650';days.min='0';days.step='1';}
+  selection.addEventListener('change',changeMode);changeMode();
+  return;
+ }
  if(id==='contract'){const terms=d.financial?.terms||{};modal('Regra contratual do processo','<p>Juros simples sobre o principal restante; multa única no primeiro atraso. Recebimentos abatem juros, multa e principal. Confirme que estas regras correspondem ao contrato. Processos com movimentos financeiros não podem ser alterados.</p>'+input('contract_ref','Referência do contrato','text',process.contract_ref||'')+select('financial_mode','Periodicidade contratual',financialModes,terms.mode||'none')+input('interest_percent','Juros por período (%)','number',process.interest_percent||'0')+input('fine_percent','Multa única (%)','number',process.fine_percent||'0')+input('grace_days','Carência em dias','number',terms.grace_days||'0'),async data=>{await api.rpc('contract',{id:process.id,...data});state.detail=await api.rpc('detail',{id:process.id});});return;}
  if(id==='client-processes'){state.filters={creditor_id:process.creditor_id,scope:'Todos'};state.tab=0;await load();return;}
  if(id==='status'){modal('Alterar situação',select('status','Situação',statuses,process.app_status)+input('reason','Motivo'),async data=>{await api.rpc('status',{id:process.id,...data});state.detail=await api.rpc('detail',{id:process.id});});return;}
