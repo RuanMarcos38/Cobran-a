@@ -79,6 +79,7 @@ export async function openDocumentImport({api,guard,onImported=async()=>{},mode=
   if(busy||!reviewed)throw Error('Faça a conferência do documento.');
   if(!pane.querySelector('[name=reviewed]')?.checked)throw Error('Confirme a conferência do documento original.');
   busy=true;save.disabled=true;read.disabled=true;
+  let attachmentWarning='';
   try{
    const data=Object.fromEntries(new FormData(form));
    const fields=Object.fromEntries(new FormData(pane));
@@ -104,10 +105,10 @@ export async function openDocumentImport({api,guard,onImported=async()=>{},mode=
      try{
       const mime=sourceFile.name.toLowerCase().endsWith('.pdf')?'application/pdf':sourceFile.name.toLowerCase().endsWith('.png')?'image/png':'image/jpeg';
       await api.rpc('document',{id:created.id,name:sourceFile.name,mime,content:await asBase64(sourceFile)});
-     }catch(error){status.textContent='Título criado, mas o anexo não foi salvo: '+error.message+'; evite repetir o lançamento e consulte o título cadastrado.';}
+     }catch(error){attachmentWarning='Título criado, mas o anexo não foi salvo: '+error.message+'; evite repetir o lançamento e consulte o título cadastrado.';}
     }
    }
-   if(!status.textContent)status.textContent='Cadastro concluído. Nenhuma mensagem de cobrança foi enviada.';
+   status.textContent=attachmentWarning||'Cadastro concluído. Nenhuma mensagem de cobrança foi enviada.';
    save.hidden=true;read.hidden=true;pane.querySelectorAll('input,select').forEach(el=>el.disabled=true);
    await onImported();
   }finally{busy=false;save.disabled=false;read.disabled=false;}
