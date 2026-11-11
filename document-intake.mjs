@@ -37,6 +37,7 @@ export function interpretDocumentText(text,kind){
  // OCR is uncertain: never treat these fields as verified bank information.
  if(kind==='cheque'){
   const values=[...clean.matchAll(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})/g)].map(m=>money(m[1])).filter(Boolean);
+  // Cheques brasileiros frequentemente mostram somente o valor inteiro, como R$ 7.970.\n  for(const m of clean.matchAll(/R\$\s*(\d{1,3}(?:\.\d{3})+)(?![,\d])/g))values.push(m[1].replace(/\./g,'')+'.00');
   const dateCandidates=[...clean.matchAll(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](20\d{2})\b/g)].map(m=>isoDate(m[1],m[2],m[3])).filter(Boolean);
   return {kind,status:'review_required',original_text:clean,amount_candidates:[...new Set(values)],
     date_candidates:[...new Set(dateCandidates)],cheque_number:field(clean,/cheque\s*(?:n[ºo.]*)?\s*[:#-]?\s*(\d{5,10})/i),
