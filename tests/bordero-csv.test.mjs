@@ -89,7 +89,7 @@ test('IPANEMA KIDS: 8 titulos com codigo do devedor, CSV com virgulas e cabecalh
  ];
  const lines=['Nome Cliente,Cód. Cliente,Identificação do Título,Data Vencto,Valor Aberto',
   ...records.map(([ref,due,value])=>['IPANEMA KIDS CABO FRIO LTDA','1775',ref,due,value].join(','))];
- const parsed=parseBorderoCsv(Buffer.from(lines.join('\\r\\n'),'utf8'),'IPANEMA_KIDS_BORDEROS_COMPATIVEL.csv');
+ const parsed=parseBorderoCsv(Buffer.from(lines.join('\r\n'),'utf8'),'IPANEMA_KIDS_BORDEROS_COMPATIVEL.csv');
  assert.equal(parsed.count,8);
  assert.equal(parsed.total,'50999.58');
  assert.deepEqual(parsed.errors,[]);
