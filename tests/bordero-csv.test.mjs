@@ -80,7 +80,7 @@ test('regressão de layout ELISATEX: 14 lançamentos, 24 colunas, CP1252, identi
 });
 
 
-test('IPANEMA KIDS: 8 titulos com codigo do devedor, CSV com virgulas e cabecalho simples',()=>{
+test('CLIENTE EXEMPLO: 8 titulos com codigo do devedor, CSV com virgulas e cabecalho simples',()=>{
  const records=[
   ['10838/02','09/03/2026','9658.20'],['10978/01','13/03/2026','7351.42'],
   ['10878/03','10/04/2026','4605.65'],['10978/02','13/04/2026','7351.42'],
@@ -88,8 +88,8 @@ test('IPANEMA KIDS: 8 titulos com codigo do devedor, CSV com virgulas e cabecalh
   ['10838/03','07/05/2026','9658.20'],['10978/03','13/05/2026','7351.42']
  ];
  const lines=['Nome Cliente,Cód. Cliente,Identificação do Título,Data Vencto,Valor Aberto',
-  ...records.map(([ref,due,value])=>['IPANEMA KIDS CABO FRIO LTDA','1775',ref,due,value].join(','))];
- const parsed=parseBorderoCsv(Buffer.from(lines.join('\r\n'),'utf8'),'IPANEMA_KIDS_BORDEROS_COMPATIVEL.csv');
+  ...records.map(([ref,due,value])=>['CLIENTE EXEMPLO CABO FRIO LTDA','1775',ref,due,value].join(','))];
+ const parsed=parseBorderoCsv(Buffer.from(lines.join('\r\n'),'utf8'),'CLIENTE_EXEMPLO_BORDEROS_COMPATIVEL.csv');
  assert.equal(parsed.count,8);
  assert.equal(parsed.total,'50999.58');
  assert.deepEqual(parsed.errors,[]);
