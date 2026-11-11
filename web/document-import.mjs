@@ -13,9 +13,9 @@ export async function openDocumentImport({api,guard,onImported=async()=>{},mode=
  if(!['cheque','devedor'].includes(mode))throw Error('Tipo de importação inválido.');
  document.querySelector('dialog')?.remove();
  const dialog=document.createElement('dialog');
- dialog.innerHTML='<form class="document-ocr-form"><div class="modal-head"><h2>'+(mode==='cheque'?'Importar cheque / dívida manual':'Cadastrar devedor com foto ou PDF')+'</h2><button type="button" data-cancel aria-label="Fechar">×</button></div><div class="form-grid"><label>Credor<select name="creditor_id" required>'+creditors.map(c=>option(c.id,c.name)).join('')+'</select></label><label>Arquivo (foto JPEG/PNG ou PDF, até 5 MB)<input name="file" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"></label></div><p>Os campos são sugestões do OCR. Verifique os originais antes de confirmar. O arquivo não é arquivado automaticamente.</p><div data-message role="status"></div><div data-review></div><div class="modal-actions"><button type="button" data-cancel>Cancelar</button><button type="button" data-read>Ler arquivo / preencher manualmente</button><button class="primary" type="submit" data-save disabled>Confirmar e cadastrar</button></div></form>';
+ dialog.innerHTML='<form class="document-ocr-form"><div class="modal-head"><h2>'+(mode==='cheque'?'Importar cheque / dívida manual':'Cadastrar devedor com foto ou PDF')+'</h2><button type="button" data-cancel aria-label="Fechar">×</button></div><div class="form-grid"><label>Credor<select name="creditor_id" required>'+creditors.map(c=>option(c.id,c.name)).join('')+'</select></label><label>Arquivo (foto JPEG/PNG ou PDF, até 5 MB)<input name="file" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"></label></div><p>Os campos são sugestões do OCR. Verifique os originais antes de confirmar. O arquivo não é arquivado automaticamente.</p><div data-message role="status"></div><div data-review></div><div class="modal-actions"><button type="button" data-cancel>Cancelar</button><button type="button" data-read>Reconhecer arquivo</button><button type="button" data-manual>Preencher manualmente</button><button class="primary" type="submit" data-save disabled>Confirmar e cadastrar</button></div></form>';
  document.body.append(dialog);dialog.showModal();
- const form=dialog.querySelector('form'),pane=dialog.querySelector('[data-review]'),status=dialog.querySelector('[data-message]'),save=dialog.querySelector('[data-save]'),read=dialog.querySelector('[data-read]');
+ const form=dialog.querySelector('form'),pane=dialog.querySelector('[data-review]'),status=dialog.querySelector('[data-message]'),save=dialog.querySelector('[data-save]'),read=dialog.querySelector('[data-read]'),manual=dialog.querySelector('[data-manual]');
  const creditor=form.elements.creditor_id;let reviewed=false,busy=false,draft=null,originalId='';let previewUrl=null;
  dialog.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>{if(!busy)dialog.close();});
  dialog.addEventListener('close',()=>{if(previewUrl)URL.revokeObjectURL(previewUrl);});
@@ -62,6 +62,7 @@ export async function openDocumentImport({api,guard,onImported=async()=>{},mode=
   if(draft?.warnings?.length)for(const warning of draft.warnings){const p=document.createElement('p');p.textContent=warning;pane.append(p);}
   reviewed=true;save.disabled=false;
  };
+ manual.onclick=()=>guard(async()=>{if(busy)return;draft=null;originalId='';await reviewMarkup();status.textContent='Preenchimento manual liberado. Confira e confirme todos os campos.';});
  read.onclick=()=>guard(async()=>{
   if(busy)return;busy=true;read.disabled=true;save.disabled=true;status.textContent='Conferindo documento…';
   try{
