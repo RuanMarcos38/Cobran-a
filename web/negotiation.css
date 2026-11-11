@@ -64,3 +64,13 @@ html[data-theme=dark] .negotiation-dialog .negotiation-ledger-table tbody td:las
 .negotiation-statement-note{font-size:12px;color:var(--muted);line-height:1.65;overflow-wrap:anywhere}.negotiation-review{background:var(--panel,#f1f4f8)}
 
 .financial-engine-view{grid-column:1/-1;min-width:0}.financial-engine-view .table-wrap{margin:14px 0;max-width:100%}.financial-engine-view p{line-height:1.5}
+
+/* Plain, persistent explanation above the negotiated debt table. */
+.negotiation-dialog .negotiation-days-guide{padding:12px 0 10px;border-top:1px solid var(--line,#d9e2ed);border-bottom:1px solid var(--line,#d9e2ed);margin:12px 0 14px;line-height:1.55}
+.negotiation-dialog .negotiation-days-guide strong{display:block;margin-bottom:6px;font-size:14px}
+.negotiation-dialog .negotiation-days-guide p{font-size:13px;margin:5px 0;line-height:1.6}
+.negotiation-dialog .negotiation-days-guide .muted{font-size:12px;color:var(--muted,#66788a)}
+.negotiation-dialog .negotiation-ledger-table :is(th,td):nth-child(5),
+.negotiation-dialog .negotiation-ledger-table :is(th,td):nth-child(6),
+.negotiation-dialog .negotiation-ledger-table :is(th,td):nth-child(7){text-align:center;white-space:nowrap}
+@media(max-width:700px){.negotiation-dialog .negotiation-days-guide p{font-size:12px}}
