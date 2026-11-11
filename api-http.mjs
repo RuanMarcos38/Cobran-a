@@ -29,9 +29,16 @@ export async function handleApi(req,res,env=process.env){
    if(body.operation&&!['health','mirror','dispatch'].includes(body.operation)){send(400,{error:'Operação reservada ao servidor'});return true;}
    if(body.operation==='dispatch'){
     const rpc=async payload=>{const r=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/cobranca_prospect_sync',{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({token:req.headers['x-integration-key'],payload}),signal:AbortSignal.timeout(20000)});const d=await r.json();if(!r.ok)throw Error('Fila comercial indisponível');return d;};
-    const automation=await automateProspects(rpc,env);
-    const delivery=await dispatchProspect(rpc,env);
-    send(200,{data:{...delivery,automation,sheet_updates:await rpc({operation:'sheet_updates'})}});return true;
+    // Failures in DNS, IMAP or WhatsApp automation must not prevent a safe SMTP claim.
+    let automation,delivery,sheet_updates;
+    const warnings=[];
+    try{automation=await automateProspects(rpc,env);}
+    catch(e){automation={enabled:false,status:'unavailable'};warnings.push('automation_unavailable');console.error(JSON.stringify({event:'prospection_automation_failed',category:e.name||'Error'}));}
+    try{delivery=await dispatchProspect(rpc,env);}
+    catch(e){delivery={status:'unavailable'};warnings.push('smtp_preflight_or_queue_unavailable');console.error(JSON.stringify({event:'prospection_dispatch_failed',category:e.name||'Error'}));}
+    try{sheet_updates=await rpc({operation:'sheet_updates'});}
+    catch(e){sheet_updates=[];warnings.push('sheet_updates_unavailable');console.error(JSON.stringify({event:'prospection_sheet_updates_failed',category:e.name||'Error'}));}
+    send(200,{data:{...delivery,automation,sheet_updates,warnings}});return true;
    }
    const upstream=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/cobranca_prospect_sync',{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({token:req.headers['x-integration-key'],payload:body}),signal:AbortSignal.timeout(20000)});
    const result=await upstream.json();send(upstream.ok?200:result.code==='28000'?401:400,upstream.ok?{data:result}:{error:'Integração comercial rejeitada. Confira a chave, a planilha e o resultado informado.'});
