@@ -16,10 +16,11 @@ export async function openDocumentImport({api,guard,onImported=async()=>{},mode=
  dialog.innerHTML='<form class="document-ocr-form"><div class="modal-head"><h2>'+(mode==='cheque'?'Importar cheque / dívida manual':'Cadastrar devedor com foto ou PDF')+'</h2><button type="button" data-cancel aria-label="Fechar">×</button></div><div class="form-grid"><label>Credor<select name="creditor_id" required>'+creditors.map(c=>option(c.id,c.name)).join('')+'</select></label><label>Arquivo (foto JPEG/PNG ou PDF, até 5 MB)<input name="file" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"></label></div><p>Os campos são sugestões do OCR. Verifique os originais antes de confirmar. O arquivo não é arquivado automaticamente.</p><div data-message role="status"></div><div data-review></div><div class="modal-actions"><button type="button" data-cancel>Cancelar</button><button type="button" data-read>Ler arquivo / preencher manualmente</button><button class="primary" type="submit" data-save disabled>Confirmar e cadastrar</button></div></form>';
  document.body.append(dialog);dialog.showModal();
  const form=dialog.querySelector('form'),pane=dialog.querySelector('[data-review]'),status=dialog.querySelector('[data-message]'),save=dialog.querySelector('[data-save]'),read=dialog.querySelector('[data-read]');
- const creditor=form.elements.creditor_id;let reviewed=false,busy=false,draft=null,originalId='';
+ const creditor=form.elements.creditor_id;let reviewed=false,busy=false,draft=null,originalId='';let previewUrl=null;
  dialog.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>{if(!busy)dialog.close();});
+ dialog.addEventListener('close',()=>{if(previewUrl)URL.revokeObjectURL(previewUrl);});
  dialog.addEventListener('cancel',e=>{if(busy)e.preventDefault();});
- function reset(){reviewed=false;draft=null;save.disabled=true;pane.innerHTML='';status.textContent='';}
+ function reset(){reviewed=false;draft=null;save.disabled=true;pane.innerHTML='';status.textContent='';if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null;}}
  form.elements.file.onchange=reset;creditor.onchange=reset;
  const changeField=(name,value)=>{const el=pane.querySelector('[name="'+name+'"]');if(el)el.value=value??'';};
  const reviewMarkup=async()=>{
@@ -44,6 +45,15 @@ export async function openDocumentImport({api,guard,onImported=async()=>{},mode=
     htmlField('return_reason','Motivo da devolução (informativo)',draft?.return_reasons?.join(', '),'text',false)+
     htmlField('notes','Observações e conferência', '', 'text',false)+'</div>';
    const amountInput=pane.querySelector('[name=original_amount]');amountInput.step='0.01';amountInput.min='0.01';
+  }
+  const file=form.elements.file.files[0];
+  if(file){
+   if(previewUrl)URL.revokeObjectURL(previewUrl);
+   previewUrl=URL.createObjectURL(file);
+   const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Conferir arquivo original';details.append(summary);
+   if(file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf')){const a=document.createElement('a');a.href=previewUrl;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Abrir PDF original para conferência';details.append(a);}
+   else {const img=document.createElement('img');img.src=previewUrl;img.alt='Documento original enviado';img.style.maxWidth='100%';img.style.maxHeight='420px';img.style.objectFit='contain';details.append(img);}
+   pane.prepend(details);
   }
   pane.insertAdjacentHTML('beforeend','<label><input type="checkbox" name="reviewed" required> Conferi os dados com o documento original e autorizo o cadastro sem cobrança automática.</label>');
   if(draft?.ocr_text){
@@ -88,9 +98,16 @@ export async function openDocumentImport({api,guard,onImported=async()=>{},mode=
     const users=lookups.users||[];
     const operator=users.find(u=>u.id===api.user()?.id)||users[0];
     if(!operator)throw Error('Nenhum responsável habilitado para a cobrança.');
-    await api.rpc('new_process',{creditor_id:data.creditor_id,debtor_id:fields.debtor_id,external_ref:ref,original_amount:amount,due_date:due,assigned_to:operator.id,financial_mode:'none',interest_percent:0,fine_percent:0,grace_days:0,contract_ref:'',notes:[fields.notes,fields.cheque_date?'Data informativa do cheque: '+fields.cheque_date:'',fields.return_reason?'Motivo de devolução (conferido): '+fields.return_reason:'',originalId?'Conferido mediante OCR — SHA256: '+originalId:''].filter(Boolean).join(' | ')});
+    const created=await api.rpc('new_process',{creditor_id:data.creditor_id,debtor_id:fields.debtor_id,external_ref:ref,original_amount:amount,due_date:due,assigned_to:operator.id,financial_mode:'none',interest_percent:0,fine_percent:0,grace_days:0,contract_ref:'',notes:[fields.notes,fields.cheque_date?'Data informativa do cheque: '+fields.cheque_date:'',fields.return_reason?'Motivo de devolução (conferido): '+fields.return_reason:'',originalId?'Conferido mediante OCR — SHA256: '+originalId:''].filter(Boolean).join(' | ')});
+    const sourceFile=form.elements.file.files[0];
+    if(sourceFile){
+     try{
+      const mime=sourceFile.name.toLowerCase().endsWith('.pdf')?'application/pdf':sourceFile.name.toLowerCase().endsWith('.png')?'image/png':'image/jpeg';
+      await api.rpc('document',{id:created.id,name:sourceFile.name,mime,content:await asBase64(sourceFile)});
+     }catch(error){status.textContent='Título criado, mas o anexo não foi salvo: '+error.message+'; evite repetir o lançamento e consulte o título cadastrado.';}
+    }
    }
-   status.textContent='Cadastro concluído. Nenhuma mensagem de cobrança foi enviada.';
+   if(!status.textContent)status.textContent='Cadastro concluído. Nenhuma mensagem de cobrança foi enviada.';
    save.hidden=true;read.hidden=true;pane.querySelectorAll('input,select').forEach(el=>el.disabled=true);
    await onImported();
   }finally{busy=false;save.disabled=false;read.disabled=false;}
