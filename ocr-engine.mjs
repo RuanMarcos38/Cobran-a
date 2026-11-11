@@ -36,8 +36,11 @@ export async function reviewDocumentUpload(file,kind){
     }
     const extracted=[];
     for(const picture of pictures){
-      const {stdout}=await command('tesseract',[picture,'stdout','-l','por+eng','--psm','3'],{maxBuffer:250000});
-      extracted.push(stdout.slice(0,40000));
+      const modes=kind==='devedor'?['4']:['3','11'];
+      for(const mode of modes){
+       const {stdout}=await command('tesseract',[picture,'stdout','-l','por+eng','--psm',mode],{maxBuffer:250000});
+       extracted.push(stdout.slice(0,20000));
+      }
     }
     const rawText=extracted.join('\n').slice(0,50000);
     if(!rawText.trim())throw Error('Documento sem texto reconhecível. Use outra imagem ou faça o preenchimento manual.');
