@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Cobrança — API de integração",
-    "version": "1.0.0",
-    "description": "API documentada com autenticação e isolamento por empresa. Chave de borderô permite somente envio ao credor conectado. Não permite leitura pública de informações. Crie ou revogue chaves em Cadastro > Integrações / API."
+    "version": "1.1.0",
+    "description": "API documentada com autenticação e isolamento por empresa. Chave de borderô permite somente envio ao credor conectado. Não permite leitura pública de informações. Crie ou revogue chaves em Cadastro > Integrações / API. Integrações SDR e cobranças usam escopo por credor, idempotência por external_id e não expõem dados sem autenticação."
   },
   "servers": [
     {
@@ -343,6 +343,124 @@
           },
           "409": {
             "description": "Conflito de versão ou horário"
+          }
+        }
+      }
+    },
+    "/api/v1/contact_events": {
+      "post": {
+        "summary": "Registrar contato externo de cobrança (telefone, WhatsApp ou e-mail)",
+        "description": "Registra evento na carteira do credor, sem enviar mensagem ou efetuar ligação. Cada external_id é idempotente por conexão. O debt_id deve pertencer ao credor vinculado à chave.",
+        "security": [
+          {
+            "IntegrationKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "external_id",
+                  "debt_id",
+                  "channel",
+                  "direction",
+                  "content"
+                ],
+                "properties": {
+                  "external_id": {
+                    "type": "string",
+                    "maxLength": 160,
+                    "example": "sdr-call-20261110-001"
+                  },
+                  "debt_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "channel": {
+                    "type": "string",
+                    "enum": [
+                      "voice",
+                      "whatsapp",
+                      "email",
+                      "human"
+                    ]
+                  },
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "inbound",
+                      "outbound",
+                      "internal"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "registered",
+                      "sent",
+                      "failed",
+                      "blocked",
+                      "escalated"
+                    ],
+                    "default": "registered"
+                  },
+                  "subject": {
+                    "type": "string",
+                    "maxLength": 250
+                  },
+                  "content": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "provider_message_id": {
+                    "type": "string",
+                    "maxLength": 250
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evento gravado ou duplicado identificado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "saved": {
+                          "type": "boolean"
+                        },
+                        "duplicate": {
+                          "type": "boolean"
+                        },
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos ou título fora da carteira"
+          },
+          "401": {
+            "description": "Chave inválida"
+          },
+          "429": {
+            "description": "Limite de requisições"
           }
         }
       }
