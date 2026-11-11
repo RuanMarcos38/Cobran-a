@@ -63,7 +63,7 @@ begin
 end$$;
 revoke all on function cobranca_private.integration_contact_event(text,jsonb) from public,anon,authenticated;
 create or replace function public.cobranca_contact_event(token text,payload jsonb)
-returns jsonb language sql security invoker set search_path='' as $$
+returns jsonb language sql security definer set search_path='' as $
  select cobranca_private.integration_contact_event(token,payload)
 $$;
 revoke all on function public.cobranca_contact_event(text,jsonb) from public;
