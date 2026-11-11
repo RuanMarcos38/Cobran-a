@@ -34,8 +34,8 @@ export async function openNegotiation({api,modal,notify,guard,profile,refresh,op
  let {detail,quote}=await loadNegotiation(api,id);const process=detail.process,limit=profile.discount_limit||0;
  const canRecordPayment=openPayment&&['admin','master','finance'].includes(profile.role);
  const originals=new Map([[id,process]]);if(quote.items)for(let i=0;i<quote.items.length;i+=4){const batch=await Promise.all(quote.items.slice(i,i+4).filter(x=>x.id!==id).map(async x=>[x.id,(await api.rpc('detail',{id:x.id})).process]));for(const [key,value] of batch)originals.set(key,value);}
- let refreshFailed=false,ratePending=false;const rateOverrides={};const quotePayload=()=>({id,rate_overrides:rateOverrides});
- const blocked=()=>ratePending?'Recalculando percentuais da negociação…':refreshFailed?'A atualização do saldo está pendente. Aguarde a reconexão ou reabra a negociação.':quote.configured===false?'Configure a regra do contrato antes de formalizar.':detail.agreements.some(a=>a.status==='active')?'Este título já tem acordo ativo. Consulte suas parcelas no processo.':['paid','uncollectible','cancelled','canceled'].includes(process.status)?'Título encerrado: formalização indisponível.':'';
+ let refreshFailed=false,ratePending=false,dayMismatch=false;const rateOverrides={};const quotePayload=()=>({id,rate_overrides:rateOverrides});
+ const blocked=()=>dayMismatch?'Divergência de dias/juros: verifique a regra contratual antes de formalizar.':ratePending?'Recalculando percentuais da negociação…':refreshFailed?'A atualização do saldo está pendente. Aguarde a reconexão ou reabra a negociação.':quote.configured===false?'Configure a regra do contrato antes de formalizar.':detail.agreements.some(a=>a.status==='active')?'Este título já tem acordo ativo. Consulte suas parcelas no processo.':['paid','uncollectible','cancelled','canceled'].includes(process.status)?'Título encerrado: formalização indisponível.':'';
  const input=(name,label,value,type='number',extra='')=>`<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" ${extra} required></label>`;
  let manualDates=null,manualAmounts=null,manualTemplate=false,entryVerified=false,calendarConfig=null;
  let lastSimulation,proposalText='',finalized,quoteBusy=false;
@@ -61,7 +61,7 @@ export async function openNegotiation({api,modal,notify,guard,profile,refresh,op
   const previousLedger=dialog.querySelector('.negotiation-ledger-scroll'),scroll={top:previousLedger?.scrollTop||0,left:previousLedger?.scrollLeft||0};
   const rows=negotiationTitleRows(quote.items?quote:{items:[{id,reference:process.external_ref,quote:{...quote,due_date:quote.due_date||process.due_date}}]},originals);
   const dayRows=rows.map(r=>financialDayBreakdown(r,quote.as_of));
-  const daysDisagree=dayRows.some(d=>d.mismatch);
+  const daysDisagree=dayRows.some(d=>d.mismatch);dayMismatch=daysDisagree;
   const number=v=>v===undefined?'—':brl(v);
   const cell=(v,money=false)=>'<td'+(money?' class="ledger-money"':'')+'>'+esc(money?number(v):v)+'</td>';
   const rateCell=(r,key,amount)=>{const rateKey={interest_percent:'rate',fine_percent:'fine_rate',fee_percent:'fee_rate'}[key], label={interest_percent:'Juros',fine_percent:'Multa',fee_percent:'Honorários'}[key];return '<td class="ledger-money">'+esc(number(amount))+'<label class="negotiation-rate"><span>'+label+' (%)</span><input type="number" data-rate-id="'+esc(r.id)+'" data-rate-key="'+key+'" aria-label="'+label+' (%) do título '+esc(r.reference)+'" min="0" max="'+esc(r.contract_terms?.[key]||0)+'" step="0.01" value="'+esc(rateOverrides[r.id]?.[key]??r[rateKey])+'"><span>%</span></label></td>';};
