@@ -3,12 +3,14 @@ import {dispatchProspect} from './prospection-mail.mjs';
 import {automateProspects} from './prospection-automation.mjs';
 import {handleBank} from './bank.mjs';
 import {parseBorderoCsv} from './bordero-csv.mjs';
+import {reviewDocumentUpload} from './ocr-engine.mjs';
 import {handleChannel} from './whatsapp.mjs';
 import {issueBooking} from './booking.mjs';
 import {handleWhatsapp} from './evolution.mjs';
 import {handleEmail} from './email.mjs';
 import {readFile} from 'node:fs/promises';
 const limits=new Map();
+const ocrLimits=new Map();
 export async function handleApi(req,res,env=process.env){
  const url=new URL(req.url,'http://localhost');if(!url.pathname.startsWith('/api/'))return false;
  res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Authorization,Content-Type,X-Integration-Key');res.setHeader('Access-Control-Allow-Methods','POST,GET,OPTIONS');
@@ -18,7 +20,7 @@ export async function handleApi(req,res,env=process.env){
  if(req.method!=='POST'||!/^\/api\/v1\/[a-z_]+$/.test(url.pathname)){send(404,{error:'Endpoint não encontrado'});return true;}
  const ip=req.socket.remoteAddress||'unknown',now=Date.now(),limit=limits.get(ip);if(limit&&limit.until>now&&limit.count>=120){send(429,{error:'Limite de requisições atingido. Aguarde um minuto.'});return true;}limits.set(ip,{until:limit&&limit.until>now?limit.until:now+60000,count:limit&&limit.until>now?limit.count+1:1});if(limits.size>10000)for(const[k,v]of limits)if(v.until<now)limits.delete(k);
  if(!env.SUPABASE_URL||!env.SUPABASE_PUBLISHABLE_KEY){send(503,{error:'Backend indisponível'});return true;}
- let body;try{let size=0,parts=[];for await(const chunk of req){size+=chunk.length;if(size>(url.pathname==='/api/v1/bordero_preview'?7*1024*1024:1024*1024)){send(413,{error:url.pathname==='/api/v1/bordero_preview'?'Arquivo CSV limitado a 5 MB':'Envio limitado a 1 MB'});return true;}parts.push(chunk);}body=JSON.parse(Buffer.concat(parts).toString('utf8'));if(!body||Array.isArray(body)||typeof body!=='object')throw Error();}catch{send(400,{error:'JSON inválido'});return true;}
+ let body;try{let size=0,parts=[];for await(const chunk of req){size+=chunk.length;if(size>(['/api/v1/bordero_preview','/api/v1/document_ocr'].includes(url.pathname)?7*1024*1024:1024*1024)){send(413,{error:url.pathname==='/api/v1/bordero_preview'?'Arquivo CSV limitado a 5 MB':'Envio limitado a 1 MB'});return true;}parts.push(chunk);}body=JSON.parse(Buffer.concat(parts).toString('utf8'));if(!body||Array.isArray(body)||typeof body!=='object')throw Error();}catch{send(400,{error:'JSON inválido'});return true;}
  const operation=url.pathname.split('/').at(-1),bordero=['borderos','erp_sync','commercial_schedule','prospect_booking','commercial_prospection'].includes(operation);const authorization=req.headers.authorization;
  if(bordero&&!req.headers['x-integration-key']){send(401,{error:'Informe X-Integration-Key'});return true;}
  if(!bordero&&operation!=='public_booking'&&!/^Bearer [A-Za-z0-9._-]+$/.test(authorization||'')){send(401,{error:'Autenticação Bearer obrigatória'});return true;}
@@ -34,6 +36,26 @@ export async function handleApi(req,res,env=process.env){
    const upstream=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/cobranca_prospect_sync',{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({token:req.headers['x-integration-key'],payload:body}),signal:AbortSignal.timeout(20000)});
    const result=await upstream.json();send(upstream.ok?200:result.code==='28000'?401:400,upstream.ok?{data:result}:{error:'Integração comercial rejeitada. Confira a chave, a planilha e o resultado informado.'});
   }catch{send(502,{error:'Não foi possível confirmar a operação comercial. Confira o painel antes de repetir um envio.'});}return true;
+ }
+ if(operation==='document_ocr'){
+  const key=ip, previous=ocrLimits.get(key),current=Date.now();
+  const entry=previous&&previous.until>current?previous:{until:current+60000,count:0};
+  if(++entry.count>5){send(429,{error:'Limite de OCR por minuto excedido.'});return true;}
+  ocrLimits.set(key,entry);
+  if(ocrLimits.size>5000)for(const [k,v] of ocrLimits)if(v.until<current)ocrLimits.delete(k);
+  try{
+   const f=body.file,kind=body.kind;
+   if(!['cheque','devedor'].includes(kind)||!body.creditor_id||!f)throw Error('Informe documento, tipo e carteira do credor.');
+   const upstream=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/cobranca_app',{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:authorization,'Content-Type':'application/json'},body:JSON.stringify({action:'profile',payload:{}}),signal:AbortSignal.timeout(15000)});
+   const profile=await upstream.json();
+   if(!upstream.ok||!['admin','master','supervisor'].includes(profile.role)){send(403,{error:'Somente perfis de gestão podem importar documentos.'});return true;}
+   const cred=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/cobranca_app',{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:authorization,'Content-Type':'application/json'},body:JSON.stringify({action:'bordero_context',payload:{creditor_id:body.creditor_id}}),signal:AbortSignal.timeout(15000)});
+   if(!cred.ok){send(403,{error:'Carteira não autorizada.'});return true;}
+   const creditor=await cred.json();
+   const result=await reviewDocumentUpload(f,kind);
+   send(200,{data:{...result,creditor:{id:creditor.id,name:creditor.name}}});
+  }catch(e){send(400,{error:e.message});}
+  return true;
  }
  if(operation==='bordero_preview'){
   try{
