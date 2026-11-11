@@ -5,7 +5,7 @@ export const navigation=[
   item('Processo','Cobrança','Cobranças e acordos','file',[['Processo','Processo']]),
   item('Processo','WhatsApp da cobrança'),item('Atendimento','Central de atendimento','E-mail de atendimento'),item('Processo','Agenda da cobrança','Agenda de cobrança','calendar')]},
  {label:'Relatórios',icon:'chart',items:[
-  item('Relatórios','Painel gerencial'),item('Relatórios','Financeiro','Recebimentos, honorários e repasses','money',[['Financeiro','Recebimentos'],['Processo','Consulta de Recebimentos'],['Financeiro','Honorários e Repasses']]),
+  item('Relatórios','Acompanhamento do credor','Área do cliente / acompanhamento'),item('Relatórios','Painel gerencial'),item('Relatórios','Financeiro','Recebimentos, honorários e repasses','money',[['Financeiro','Recebimentos'],['Processo','Consulta de Recebimentos'],['Financeiro','Honorários e Repasses']]),
   ...['Títulos Cadastrados','Títulos Captados','Processos do Cliente — Totais','Histórico do Processo','E-mail de Clientes','Clientes Inativos','Análise Gerencial'].map(s=>item('Relatórios',s)),
   item('Financeiro','Resultado da Cobrança'),item('Financeiro','Histórico dos clientes','Histórico financeiro dos clientes')]},
  {label:'Configurações',icon:'gear',items:[item('Cadastro','Usuários','Usuários e permissões','user'),item('Cadastro','Regras de comissão'),item('Cadastro','Integrações / API'),item('Comercial','Integração n8n'),item('Financeiro','Integrações ERP'),item('Financeiro','Integração bancária / Boletos')]},
