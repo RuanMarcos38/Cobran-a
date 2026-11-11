@@ -8,7 +8,7 @@ const aliases={
   debtor_name:['Nome Cliente','Razão do Cliente','Devedor'],
   address:['Endereço Cobrança','Endereço'],district:['Bairro'],city:['Cidade'],state:['UF'],zip:['CEP'],
   ddd:['DDD'],phone:['Telefone'],species:['Especie do Título'],
-  external_ref:['Identificação (Código) do Título','Número do título','Núm. Título'],
+  external_ref:['Identificação (Código) do Título','Identificação do Título','Número do título','Núm. Título'],
   installment:['Parcela'],issued_at:['Data emissão'],due_date:['Data Vencto','Vencimento'],
   original_amount:['Valor Aberto','Vlr. Aberto'],protest_amount:['Valor do protesto'],
   notes:['Observações','Obs. Título'],debtor_code:['Cód. Identificador Devedor','Cód. Cliente'],
