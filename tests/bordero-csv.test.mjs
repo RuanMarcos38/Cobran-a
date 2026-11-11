@@ -78,3 +78,22 @@ test('regressão de layout ELISATEX: 14 lançamentos, 24 colunas, CP1252, identi
  assert.ok(parsed.warnings.some(x=>/mesmo identificador/i.test(x)));
  // Todos os documentos, identificadores, empresas e valores da amostra são fictícios.
 });
+
+
+test('IPANEMA KIDS: 8 titulos com codigo do devedor, CSV com virgulas e cabecalho simples',()=>{
+ const records=[
+  ['10838/02','09/03/2026','9658.20'],['10978/01','13/03/2026','7351.42'],
+  ['10878/03','10/04/2026','4605.65'],['10978/02','13/04/2026','7351.42'],
+  ['10763/03','24/04/2026','2917.61'],['10878/02','28/04/2026','2105.66'],
+  ['10838/03','07/05/2026','9658.20'],['10978/03','13/05/2026','7351.42']
+ ];
+ const lines=['Nome Cliente,Cód. Cliente,Identificação do Título,Data Vencto,Valor Aberto',
+  ...records.map(([ref,due,value])=>['IPANEMA KIDS CABO FRIO LTDA','1775',ref,due,value].join(','))];
+ const parsed=parseBorderoCsv(Buffer.from(lines.join('\\r\\n'),'utf8'),'IPANEMA_KIDS_BORDEROS_COMPATIVEL.csv');
+ assert.equal(parsed.count,8);
+ assert.equal(parsed.total,'50999.58');
+ assert.deepEqual(parsed.errors,[]);
+ assert.equal(parsed.needs_confirmation,false);
+ assert.deepEqual(parsed.rows.map(r=>r.external_ref),records.map(r=>r[0]));
+ assert.ok(parsed.rows.every(r=>r.debtor_code==='1775'));
+});
