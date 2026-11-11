@@ -210,7 +210,7 @@ async function action(id){if(id==='toggle-filters'){const form=$('#filters'),exp
    ],initial)+input('days','Dias de carência personalizada','number',previous.days??terms.grace_days??0,false)+input('reason','Justificativa da alteração','text','',true),
    async data=>{
     if(!['inherit','custom','none'].includes(data.selection))throw Error('Modalidade inválida.');
-    if(data.selection==='custom'&&(!/^\\d{1,4}$/.test(String(data.days))||Number(data.days)>3650))throw Error('Informe de 0 a 3650 dias.');
+    if(data.selection==='custom'&&(!Number.isInteger(Number(data.days))||Number(data.days)<0||Number(data.days)>3650))throw Error('Informe de 0 a 3650 dias.');
     if(String(data.reason||'').trim().length<10)throw Error('Justifique a alteração (mínimo 10 caracteres).');
     const result=await api.rpc('title_grace',{id:process.id,selection:data.selection,days:data.days,reason:data.reason});
     if(result.due_date!==process.due_date)throw Error('O vencimento original foi alterado inesperadamente. Solicite conferência.');
