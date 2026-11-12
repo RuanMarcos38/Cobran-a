@@ -5,14 +5,14 @@ const previousNavigation=[
   item('Processo','Cobrança','Cobranças e acordos','file',[['Processo','Processo']]),
   item('Processo','WhatsApp da cobrança'),item('Atendimento','Central de atendimento','E-mail de atendimento'),item('Processo','Agenda da cobrança','Agenda de cobrança','calendar')]},
  {label:'Relatórios',icon:'chart',items:[
-  item('Relatórios','Acompanhamento do credor','Área do cliente / acompanhamento'),item('Relatórios','Painel gerencial'),item('Relatórios','Financeiro','Recebimentos, honorários e repasses','money',[['Financeiro','Recebimentos'],['Processo','Consulta de Recebimentos'],['Financeiro','Honorários e Repasses']]),
+  item('Relatórios','Acompanhamento do credor','Área do credor'),item('Relatórios','Painel gerencial'),item('Relatórios','Financeiro','Recebimentos, honorários e repasses','money',[['Financeiro','Recebimentos'],['Processo','Consulta de Recebimentos'],['Financeiro','Honorários e Repasses']]),
   ...['Títulos Cadastrados','Títulos Captados','Processos do Cliente — Totais','Histórico do Processo','E-mail de Clientes','Clientes Inativos','Análise Gerencial'].map(s=>item('Relatórios',s)),
   item('Financeiro','Resultado da Cobrança'),item('Financeiro','Histórico dos clientes','Histórico financeiro dos clientes')]},
  {label:'Configurações',icon:'gear',items:[item('Cadastro','Usuários','Usuários e permissões','user'),item('Cadastro','Regras de comissão'),item('Cadastro','Integrações / API'),item('Comercial','Integração n8n'),item('Financeiro','Integrações ERP'),item('Financeiro','Integração bancária / Boletos')]},
  {label:'Carteiras e Borderôs',icon:'folder',items:[item('Processo','Carteiras de credores','Carteiras e importação de borderôs'),item('Cadastro','Distribuição automática')]},
  {label:'Cadastros',icon:'user',items:['Minha empresa','Credores / Clientes','Devedores','Cadastros auxiliares'].map(s=>item('Cadastro',s))},
  {label:'Financeiro',icon:'money',items:['Despesas','Contas a pagar','Contas a receber','Faturamento','Crédito','Conciliação bancária','Precificação e Honorários','Simulador financeiro','Fechamento mensal'].map(s=>item('Financeiro',s)).concat(item('Comercial','Comissões comerciais'))},
- {label:'Comercial',icon:'user',items:[item('Comercial','Prospecção'),item('Comercial','Funil / Kanban'),item('Comercial','Atendimento','WhatsApp comercial'),item('Comercial','E-mail comercial'),item('Comercial','Agendamentos','Agenda comercial','calendar')]}
+ {label:'Comercial',icon:'user',items:[item('Comercial','Prospecção','Prospecção e funil','user',[['Comercial','Funil / Kanban']]),item('Comercial','Atendimento','WhatsApp comercial'),item('Comercial','E-mail comercial'),item('Comercial','Agendamentos','Agenda comercial','calendar')]}
 ];
 const menuSections=[
  ['Painéis e Dashboards','chart',['Dashboard Geral','Painel gerencial','Análise Gerencial','Resultado da Cobrança','Histórico dos clientes','Acompanhamento do credor']],
@@ -20,7 +20,7 @@ const menuSections=[
  ['Carteiras, Processos e Títulos','folder',['Carteiras de credores','Distribuição automática','Títulos Cadastrados','Títulos Captados','Processos do Cliente — Totais']],
  ['Cadastros','user',['Credores / Clientes','Devedores','Minha empresa','Cadastros auxiliares','Usuários']],
  ['Financeiro e Prestação de Contas','money',['Financeiro','Despesas','Contas a pagar','Contas a receber','Faturamento','Crédito','Conciliação bancária','Precificação e Honorários','Simulador financeiro','Fechamento mensal','Comissões comerciais']],
- ['Comercial e Relacionamento','user',['Prospecção','Funil / Kanban','Atendimento','E-mail comercial','Agendamentos','E-mail de Clientes','Clientes Inativos']],
+ ['Comercial e Relacionamento','user',['Prospecção','Atendimento','E-mail comercial','Agendamentos','E-mail de Clientes','Clientes Inativos']],
  ['Integrações e Configurações','gear',['Regras de comissão','Integrações / API','Integração n8n','Integrações ERP','Integração bancária / Boletos']]
 ];
 const entries=[item('Relatórios','Dashboard Geral','Dashboard Geral','chart'),...previousNavigation.flatMap(group=>group.items)];
