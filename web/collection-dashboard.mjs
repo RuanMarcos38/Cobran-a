@@ -107,6 +107,25 @@ function portfolioChart(months){
   '<polygon points="'+points[0][0]+',125 '+line+' '+points.at(-1)[0]+',125"/><polyline points="'+line+'"/>'+
   points.map(([x,y],index)=>'<circle cx="'+x+'" cy="'+y+'" r="4"><title>'+esc(rows[index].label+': '+rows[index].titles+' títulos')+'</title></circle><text x="'+x+'" y="147" text-anchor="middle">'+esc(rows[index].label)+'</text>').join('')+'</svg></section>';
 }
+
+function statusChart(rows){
+ const visible=rows.slice(0,4);
+ const other=rows.slice(4).reduce((sum,row)=>sum+row.titles,0);
+ if(other)visible.push({label:'Outras situações',titles:other});
+ const total=visible.reduce((sum,row)=>sum+row.titles,0);
+ if(!total)return '<section class="panel corporate-dashboard-panel"><h3>Títulos por situação</h3><p>Nenhum título no recorte selecionado.</p></section>';
+ let offset=0;
+ const arcs=visible.map((row,index)=>{
+  const length=100*row.titles/total;
+  const arc='<circle class="status-color-'+index+'" cx="55" cy="55" r="43" pathLength="100" stroke-dasharray="'+length+' '+(100-length)+'" stroke-dashoffset="'+(-offset)+'"/>';
+  offset+=length;
+  return arc;
+ }).join('');
+ return '<section class="panel corporate-dashboard-panel executive-status-chart"><h3>Títulos por situação</h3><div>'+
+  '<svg viewBox="0 0 110 110" aria-hidden="true"><g transform="rotate(-90 55 55)">'+arcs+'</g><text x="55" y="53">'+total+'</text><text class="status-caption" x="55" y="67">Títulos</text></svg>'+
+  '<ul>'+visible.map((row,index)=>'<li><i class="status-color-'+index+'"></i><span>'+esc(row.label)+'</span><strong>'+row.titles+'</strong></li>').join('')+'</ul></div></section>';
+}
+
 function recentNegotiations(rows,lookups){
  const columns=['Título','Credor','Devedor','Saldo atualizado','Situação','Responsável'];
  const creditors=new Map((lookups.creditors||[]).map(row=>[row.id,row.name]));
@@ -131,13 +150,10 @@ export function renderCollectionDashboard({target,data,financial,filters,lookups
  ];
  const financialDetails=[['fees','Honorários gerados'],['remittances','Valores a repassar']]
   .filter(([key])=>financial?.[key]!=null);
- const titleStatus=['Em cobrança','Em negociação','Acordo formalizado','Aguardando pagamento'];
- const stages=titleStatus.map(label=>({label,titles:data.status?.find(row=>row.label===label)?.titles??0}));
  const problem=data.tooLarge?'O recorte contém mais de 2.000 títulos. Selecione uma carteira ou um período menor.':
   data.changed?'A carteira mudou durante a consulta. Aplique os filtros novamente.':'';
  const activeFilters=Object.entries(filters).some(([key,value])=>value&&(key!=='scope'||value!=='Abertos'));
  target.innerHTML='<div class="corporate-dashboard executive-dashboard">'+
-  '<div class="executive-photo"><img src="https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&amp;fit=crop&amp;w=1600&amp;q=85" alt="" referrerpolicy="no-referrer"></div>'+
   '<details class="panel executive-filter"'+(activeFilters||problem?' open':'')+'><summary>Filtrar painel</summary><form class="corporate-dashboard-filters">'+
   select('creditor_id','Carteira / credor',lookups.creditors||[],filters.creditor_id)+select('debtor_id','Devedor',titleOptions,filters.debtor_id)+
   select('assigned_to','Cobrador',lookups.users||[],filters.assigned_to)+select('status','Situação',options(statuses),filters.status)+
@@ -150,7 +166,7 @@ export function renderCollectionDashboard({target,data,financial,filters,lookups
   (problem?'<p class="notice" role="status">'+esc(problem)+'</p>':
    '<div class="metrics executive-metrics">'+metrics.map(([label,value,icon,description])=>'<article class="metric executive-metric">'+
     metricIcon(icon)+'<div><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong><small>'+esc(description)+'</small></div></article>').join('')+'</div>'+
-   '<div class="executive-charts">'+portfolioChart(data.months)+breakdown('Etapas de cobrança',stages,'titles',String)+'</div>'+
+   '<div class="executive-charts">'+portfolioChart(data.months)+statusChart(data.status)+breakdown('Títulos por cobrador',data.collectors.slice(0,4),'titles',String)+'</div>'+
    recentNegotiations(data.recent,lookups)+
    '<details class="panel executive-details"><summary>Detalhamento da carteira</summary><div class="corporate-dashboard-grid">'+
    breakdown('Saldo por faixa de atraso',data.aging,'balance',amounts)+breakdown('Títulos por situação',data.status,'titles',String)+
