@@ -118,3 +118,57 @@ html :is(.app-main,.login,dialog) :is(button,input,select,textarea,summary,a):fo
 .collection-login-layout .login{align-self:center;width:min(440px,calc(100% - 32px));max-width:none;margin:28px auto}
 @media(max-width:760px){.collection-login-layout{grid-template-columns:1fr}.collection-hero-login{min-height:240px}.collection-hero-copy{padding-block:26px}.collection-hero{min-height:285px}.collection-hero::before{background:linear-gradient(90deg,#032723f5,#03272390)}}
 @media print{.collection-hero{display:none}}
+
+/* Identidade da R&R e composição do painel executivo */
+:root{
+ --institutional:#0b2549;--institutional-hover:#173b66;
+ --line:#d4ddeb;--canvas:#f4f7fb;--ink:#102442;--navy:#0b2549;
+ --subtle:#475874;--wash:#eaf0f8;--blue:#0d55b3;--ui-radius:10px;
+}
+html[data-theme=dark]{
+ --institutional:#081b36;--institutional-hover:#16365d;
+ --line:#344968;--canvas:#101b2d;--surface:#182842;--ink:#edf4ff;--navy:#edf4ff;
+ --subtle:#c0cfe3;--wash:#243953;--blue:#91bdff;
+}
+.sidebar-brand,html[data-theme=dark] .sidebar-brand{display:flex;flex-direction:column;justify-content:center;gap:2px}
+.sidebar-brand .rr-monogram{font-family:Georgia,serif;font-size:36px;line-height:1;letter-spacing:-.04em}
+.rr-monogram span{color:#e6b866}
+.sidebar-brand small{color:#e3edfc;font-size:12px}
+.sidebar .nav .nav-group-toggle,.sidebar .nav a[data-section]{color:#e7effc}
+.sidebar .nav a[data-section].active{background:#0b54b8;color:#fff}
+.sidebar .nav :is(button,a):focus-visible{outline-color:#e6b866}
+html :is(.app-main,.login,dialog) button.primary,html[data-theme=dark] :is(.app-main,.login,dialog) button.primary{background:#0b54b8;border-color:#0b54b8;color:#fff}
+html :is(.app-main,.login,dialog) button.primary:hover:not(:disabled){background:#083e8a}
+.executive-main .page-heading{background:linear-gradient(115deg,var(--canvas) 40%,var(--wash));padding-block:20px}
+.executive-main .page-heading h1{font-size:clamp(24px,3vw,38px);letter-spacing:-.03em}
+.executive-main .page-heading>small,.executive-main .workspace-title{display:none}
+.executive-main .workspace{background:transparent;border:0}
+.executive-dashboard{gap:14px}
+.executive-filter summary,.executive-details summary{cursor:pointer;font-weight:650;color:var(--blue)}
+.executive-filter form,.executive-details .corporate-dashboard-grid{margin-top:14px}
+.executive-dashboard .executive-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+.executive-dashboard .executive-metric{display:flex;align-items:flex-start;gap:12px}
+.executive-metric>div{min-width:0;display:grid;gap:4px}
+.executive-metric strong{font-variant-numeric:tabular-nums}
+.executive-metric small,.executive-chart p,.executive-recent p{color:var(--subtle)}
+.executive-metric-icon{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:10px;background:var(--wash);color:var(--blue)}
+.executive-metric-icon svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round}
+.executive-charts{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px}
+.executive-charts .panel,.executive-recent{min-width:0;border:1px solid var(--line)}
+.executive-chart p,.executive-recent p{margin:0 0 10px}
+.executive-chart svg{display:block;width:100%;height:auto;max-height:220px;color:var(--blue);overflow:visible}
+.executive-chart polygon{fill:currentColor;opacity:.14}
+.executive-chart polyline{fill:none;stroke:currentColor;stroke-width:3;stroke-linejoin:round}
+.executive-chart circle{fill:var(--surface);stroke:currentColor;stroke-width:2}
+.executive-chart text{font-size:13px;fill:var(--subtle)}
+.executive-gridline{stroke:var(--line);fill:none}
+.executive-recent .table-wrap{max-width:100%;overflow:auto}
+.executive-status{display:inline-block;border-radius:5px;background:var(--wash);color:var(--blue);padding:3px 8px}
+@media(max-width:1200px){.executive-dashboard .executive-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){.executive-charts{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:460px){.executive-dashboard .executive-metrics{grid-template-columns:minmax(0,1fr)}}
+
+.executive-financial{display:flex;flex-wrap:wrap;gap:20px}.executive-financial dd{margin:4px 0 0;font-weight:700}
+
+.executive-photo{height:clamp(82px,10vw,126px);border-radius:var(--ui-radius);overflow:hidden;background:var(--institutional)}
+.executive-photo img{width:100%;height:100%;object-fit:cover;object-position:center 43%;display:block}
