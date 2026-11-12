@@ -1,6 +1,16 @@
 
 import {brl} from './money.mjs';
 
+export function collectionHero(login=false){
+ return `<section class="collection-hero${login?' collection-hero-login':''}" aria-label="Gestão de cobrança">
+  <img src="https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&amp;fit=crop&amp;w=1800&amp;q=85" alt="" referrerpolicy="no-referrer" fetchpriority="high">
+  <div class="collection-hero-copy"><span>Recuperação de crédito</span>
+   <h2>Gestão profissional para <em>cobrança</em>, acordos e carteira em aberto</h2>
+   <p>Credores, devedores, títulos, contatos, negociações, recebimentos e repasses em uma plataforma.</p>
+   ${login?'':`<div class="collection-hero-actions"><a href="#/Processo/Cobran%C3%A7a">Abrir cobranças</a><a href="#/Relat%C3%B3rios/Painel%20gerencial">Ver relatórios</a></div>`}
+  </div></section>`;
+}
+
 const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const dateOnly=value=>String(value??'').slice(0,10);
 const dateMillis=value=>/^\d{4}-\d{2}-\d{2}$/.test(value)?Date.parse(value+'T00:00:00Z'):NaN;
@@ -19,7 +29,7 @@ function add(group,key,amount){
  totals.titles++;totals.balance+=amount;group.set(key,totals);
 }
 export function summarizeCollection(rows,filters={},asOf=businessDate()){
- const status=new Map(),collectors=new Map(),aging=new Map(),creditors=new Set(),debtors=new Set();
+ const status=new Map(),collectors=new Map(),aging=new Map(),months=new Map(),creditors=new Set(),debtors=new Set();
  for(const label of agingLabels)aging.set(label,{label,titles:0,balance:0});
  let titles=0,balance=0,overdue=0,negotiating=0,broken=0;
  for(const row of rows){
@@ -35,10 +45,13 @@ export function summarizeCollection(rows,filters={},asOf=businessDate()){
   add(status,row.app_status||'Sem situação',amount);
   add(collectors,row.collector_name||'Sem cobrador',amount);
   add(aging,bucket,amount);
+  const month=dateOnly(row.created_at).slice(0,7);
+  if(/^\d{4}-\d{2}$/.test(month))add(months,month,amount);
  }
  return {titles,balance,overdue,negotiating,broken,creditors:creditors.size,debtors:debtors.size,
   status:[...status.values()].sort((a,b)=>b.titles-a.titles),aging:[...aging.values()],
-  collectors:[...collectors.values()].sort((a,b)=>b.titles-a.titles)};
+  collectors:[...collectors.values()].sort((a,b)=>b.titles-a.titles),
+  months:[...months.values()].sort((a,b)=>a.label.localeCompare(b.label)).slice(-12).map(row=>({...row,label:row.label.slice(5)+'/'+row.label.slice(0,4)}))};
 }
 export async function loadCollectionDashboard(api,filters={}){
  const {debtor_id,aging,...requestFilters}=filters;
@@ -81,7 +94,7 @@ export function renderCollectionDashboard({target,data,financial,filters,lookups
  const financialSection=financialMetrics.length?'<section class="panel corporate-dashboard-panel"><h3>Resultado financeiro do período</h3>'+
   '<p>Os indicadores financeiros usam apenas o período e as permissões do relatório financeiro.</p><div class="metrics">'+financialMetrics.map(([key,label])=>
   '<article class="metric"><span>'+esc(label)+'</span><strong>'+esc(brl(financial[key]))+'</strong></article>').join('')+'</div></section>':'';
- target.innerHTML='<div class="corporate-dashboard"><form class="panel corporate-dashboard-filters">'+
+ target.innerHTML='<div class="corporate-dashboard">'+collectionHero()+'<form class="panel corporate-dashboard-filters">'+
   select('creditor_id','Carteira / credor',lookups.creditors||[],filters.creditor_id)+select('debtor_id','Devedor',titleOptions,filters.debtor_id)+
   select('assigned_to','Cobrador',lookups.users||[],filters.assigned_to)+select('status','Situação',options(statuses),filters.status)+
   input('start','Cadastro a partir de',filters.start,'date')+input('end','Cadastro até',filters.end,'date')+
@@ -94,7 +107,7 @@ export function renderCollectionDashboard({target,data,financial,filters,lookups
    data.changed?'<p class="notice" role="status">A carteira mudou durante a consulta. Aplique os filtros novamente para atualizar o painel.</p>':
    '<div class="metrics">'+metrics.map(([label,value])=>'<article class="metric"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></article>').join('')+'</div>'+
    '<div class="corporate-dashboard-grid">'+breakdown('Saldo por faixa de atraso',data.aging,'balance',amounts)+
-   breakdown('Títulos por situação',data.status,'titles',String)+breakdown('Títulos por cobrador',data.collectors,'titles',String)+'</div>')+financialSection+'</div>';
+   breakdown('Títulos por situação',data.status,'titles',String)+breakdown('Títulos por cobrador',data.collectors,'titles',String)+breakdown('Títulos da carteira por mês de cadastro',data.months,'titles',String)+'</div>')+financialSection+'</div>';
  const form=target.querySelector('form');
  form.elements.creditor_id.onchange=()=>{
   const creditor=form.elements.creditor_id.value;
