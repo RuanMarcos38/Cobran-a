@@ -31,12 +31,15 @@ function add(group,key,amount){
 export function summarizeCollection(rows,filters={},asOf=businessDate()){
  const status=new Map(),collectors=new Map(),aging=new Map(),months=new Map(),creditors=new Set(),debtors=new Set();
  for(const label of agingLabels)aging.set(label,{label,titles:0,balance:0});
- let titles=0,balance=0,overdue=0,negotiating=0,broken=0;
+ const recent=[];
+ let titles=0,balance=0,original=0,missingOriginal=0,overdue=0,negotiating=0,broken=0;
  for(const row of rows){
   const bucket=agingBucket(row,asOf);
   if(filters.debtor_id&&row.debtor_id!==filters.debtor_id||filters.aging&&filters.aging!==bucket)continue;
   const amount=cents(row.current_amount);
   titles++;balance+=amount;
+  if(row.original_amount==null)missingOriginal++;else original+=cents(row.original_amount);
+  if(['Em negociação','Acordo formalizado','Aguardando pagamento','Parcialmente pago','Acordo descumprido'].includes(row.app_status)&&recent.length<10)recent.push(row);
   if(row.creditor_id)creditors.add(row.creditor_id);
   if(row.debtor_id)debtors.add(row.debtor_id);
   if(row.app_status==='Em negociação')negotiating++;
@@ -48,7 +51,7 @@ export function summarizeCollection(rows,filters={},asOf=businessDate()){
   const month=dateOnly(row.created_at).slice(0,7);
   if(/^\d{4}-\d{2}$/.test(month))add(months,month,amount);
  }
- return {titles,balance,overdue,negotiating,broken,creditors:creditors.size,debtors:debtors.size,
+ return {titles,balance,original:missingOriginal?null:original,recent,overdue,negotiating,broken,creditors:creditors.size,debtors:debtors.size,
   status:[...status.values()].sort((a,b)=>b.titles-a.titles),aging:[...aging.values()],
   collectors:[...collectors.values()].sort((a,b)=>b.titles-a.titles),
   months:[...months.values()].sort((a,b)=>a.label.localeCompare(b.label)).slice(-12).map(row=>({...row,label:row.label.slice(5)+'/'+row.label.slice(0,4)}))};
@@ -82,19 +85,60 @@ function breakdown(title,rows,field,format){
   '</strong></div><meter min="0" max="'+max+'" value="'+Math.max(0,row[field])+'" aria-label="'+esc(row.label)+'"></meter></li>').join('')+'</ul>':
   '<p>Nenhum título no recorte selecionado.</p>')+'</section>';
 }
+
+const metricPaths={
+ wallet:'M3 6h17v13H3z M3 6l13-3v3 M20 10h-5v5h5',
+ balance:'M4 5h16v14H4z M7 10h10 M7 14h6',
+ chart:'M4 19h16 M6 16v-4 M12 16V8 M18 16V4',
+ agreement:'M6 3h9l3 3v15H6z M9 10h6 M9 14h6 M9 17h4'
+};
+function metricIcon(name){
+ return '<span class="executive-metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="'+metricPaths[name]+'"/></svg></span>';
+}
+function portfolioChart(months){
+ const rows=months.slice(-6);
+ if(!rows.length)return '<section class="panel corporate-dashboard-panel"><h3>Evolução da carteira</h3><p>Nenhum título no recorte selecionado.</p></section>';
+ const max=Math.max(1,...rows.map(row=>row.titles));
+ const points=rows.map((row,index)=>[rows.length===1?300:35+index*530/(rows.length-1),125-row.titles*95/max]);
+ const line=points.map(point=>point.join(',')).join(' ');
+ return '<section class="panel corporate-dashboard-panel executive-chart"><h3>Evolução da carteira</h3><p>Títulos por mês de cadastro</p>'+
+  '<svg viewBox="0 0 600 155" role="img" aria-label="'+esc(rows.map(row=>row.label+': '+row.titles+' títulos').join(', '))+'">'+
+  [30,62,94,125].map(y=>'<path class="executive-gridline" d="M35 '+y+'H565"/>').join('')+
+  '<polygon points="'+points[0][0]+',125 '+line+' '+points.at(-1)[0]+',125"/><polyline points="'+line+'"/>'+
+  points.map(([x,y],index)=>'<circle cx="'+x+'" cy="'+y+'" r="4"><title>'+esc(rows[index].label+': '+rows[index].titles+' títulos')+'</title></circle><text x="'+x+'" y="147" text-anchor="middle">'+esc(rows[index].label)+'</text>').join('')+'</svg></section>';
+}
+function recentNegotiations(rows,lookups){
+ const columns=['Título','Credor','Devedor','Saldo atualizado','Situação','Responsável'];
+ const creditors=new Map((lookups.creditors||[]).map(row=>[row.id,row.name]));
+ const debtors=new Map((lookups.debtors||[]).map(row=>[row.id,row.name]));
+ return '<section class="panel corporate-dashboard-panel executive-recent"><h3>Negociações recentes</h3>'+
+  (rows.length?'<p>Últimos títulos cadastrados em negociação ou com acordo</p><div class="table-wrap"><table><thead><tr>'+
+   columns.map(label=>'<th scope="col">'+label+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+
+    [row.external_ref,row.creditor_name||creditors.get(row.creditor_id),row.debtor_name||debtors.get(row.debtor_id),
+    brl(row.current_amount),row.app_status,row.collector_name].map((value,index)=>'<td>'+(index===4?'<span class="executive-status">'+esc(value)+'</span>':esc(value??'—'))+'</td>').join('')+
+   '</tr>').join('')+'</tbody></table></div>':'<p>Nenhum título em negociação ou com acordo no recorte selecionado.</p>')+'</section>';
+}
+
 export function renderCollectionDashboard({target,data,financial,filters,lookups,guard,apply}){
  const debtors=(lookups.debtors||[]).filter(row=>!filters.creditor_id||row.creditor_id===filters.creditor_id);
  const titleOptions=debtors.map(row=>({id:row.id,name:row.name+' · '+((lookups.creditors||[]).find(c=>c.id===row.creditor_id)?.name||'')+' · '+row.id.slice(-6)}));
  const scopes=['Abertos','Todos','Encerrados','Suspensos'];
- const metrics=data.tooLarge||data.changed?[]:[
-  ['Saldo dos títulos',amounts(data.balance)],['Saldo vencido',amounts(data.overdue)],['Títulos',data.titles],['Devedores',data.debtors],
-  ['Credores',data.creditors],['Títulos em negociação',data.negotiating],['Títulos com acordo descumprido',data.broken]];
- const financialLabels=[['recovered','Valor recuperado'],['fees','Honorários gerados'],['remittances','Valores a repassar']];
- const financialMetrics=financialLabels.filter(([key])=>financial?.[key]!=null);
- const financialSection=financialMetrics.length?'<section class="panel corporate-dashboard-panel"><h3>Resultado financeiro do período</h3>'+
-  '<p>Os indicadores financeiros usam apenas o período e as permissões do relatório financeiro.</p><div class="metrics">'+financialMetrics.map(([key,label])=>
-  '<article class="metric"><span>'+esc(label)+'</span><strong>'+esc(brl(financial[key]))+'</strong></article>').join('')+'</div></section>':'';
- target.innerHTML='<div class="corporate-dashboard">'+collectionHero()+'<form class="panel corporate-dashboard-filters">'+
+ const metrics=[
+  ['Carteira total',data.original==null?'—':amounts(data.original),'wallet','Valor original dos títulos no recorte'],
+  ['Saldo atualizado',amounts(data.balance),'balance','Saldo dos títulos no recorte'],
+  ['Total recuperado',financial?.recovered==null?'—':brl(financial.recovered),'chart','Recebimentos no período do relatório financeiro'],
+  ['Acordos ativos',financial?.agreements==null?'—':financial.agreements,'agreement','Conforme relatório financeiro']
+ ];
+ const financialDetails=[['fees','Honorários gerados'],['remittances','Valores a repassar']]
+  .filter(([key])=>financial?.[key]!=null);
+ const titleStatus=['Em cobrança','Em negociação','Acordo formalizado','Aguardando pagamento'];
+ const stages=titleStatus.map(label=>({label,titles:data.status?.find(row=>row.label===label)?.titles??0}));
+ const problem=data.tooLarge?'O recorte contém mais de 2.000 títulos. Selecione uma carteira ou um período menor.':
+  data.changed?'A carteira mudou durante a consulta. Aplique os filtros novamente.':'';
+ const activeFilters=Object.entries(filters).some(([key,value])=>value&&(key!=='scope'||value!=='Abertos'));
+ target.innerHTML='<div class="corporate-dashboard executive-dashboard">'+
+  '<div class="executive-photo"><img src="https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&amp;fit=crop&amp;w=1600&amp;q=85" alt="" referrerpolicy="no-referrer"></div>'+
+  '<details class="panel executive-filter"'+(activeFilters||problem?' open':'')+'><summary>Filtrar painel</summary><form class="corporate-dashboard-filters">'+
   select('creditor_id','Carteira / credor',lookups.creditors||[],filters.creditor_id)+select('debtor_id','Devedor',titleOptions,filters.debtor_id)+
   select('assigned_to','Cobrador',lookups.users||[],filters.assigned_to)+select('status','Situação',options(statuses),filters.status)+
   input('start','Cadastro a partir de',filters.start,'date')+input('end','Cadastro até',filters.end,'date')+
@@ -102,12 +146,17 @@ export function renderCollectionDashboard({target,data,financial,filters,lookups
   select('aging','Faixa de atraso',options(agingLabels),filters.aging)+input('process','Título / processo',filters.process)+
   input('commercial','Comercial',filters.commercial)+input('carrier','Portador',filters.carrier)+
   '<label>Processos<select name="scope">'+scopes.map(s=>'<option'+(s===(filters.scope||'Abertos')?' selected':'')+'>'+s+'</option>').join('')+'</select></label></div></details>'+
-  '<div class="corporate-filter-actions"><button class="primary" type="submit">Aplicar filtros</button><button type="button" data-clear>Limpar filtros</button></div></form>'+
-  (data.tooLarge?'<p class="notice" role="status">O recorte contém mais de 2.000 títulos. Selecione uma carteira ou um período menor para calcular os indicadores.</p>':
-   data.changed?'<p class="notice" role="status">A carteira mudou durante a consulta. Aplique os filtros novamente para atualizar o painel.</p>':
-   '<div class="metrics">'+metrics.map(([label,value])=>'<article class="metric"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></article>').join('')+'</div>'+
-   '<div class="corporate-dashboard-grid">'+breakdown('Saldo por faixa de atraso',data.aging,'balance',amounts)+
-   breakdown('Títulos por situação',data.status,'titles',String)+breakdown('Títulos por cobrador',data.collectors,'titles',String)+breakdown('Títulos da carteira por mês de cadastro',data.months,'titles',String)+'</div>')+financialSection+'</div>';
+  '<div class="corporate-filter-actions"><button class="primary" type="submit">Aplicar filtros</button><button type="button" data-clear>Limpar filtros</button></div></form>'+'</details>'+
+  (problem?'<p class="notice" role="status">'+esc(problem)+'</p>':
+   '<div class="metrics executive-metrics">'+metrics.map(([label,value,icon,description])=>'<article class="metric executive-metric">'+
+    metricIcon(icon)+'<div><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong><small>'+esc(description)+'</small></div></article>').join('')+'</div>'+
+   '<div class="executive-charts">'+portfolioChart(data.months)+breakdown('Etapas de cobrança',stages,'titles',String)+'</div>'+
+   recentNegotiations(data.recent,lookups)+
+   '<details class="panel executive-details"><summary>Detalhamento da carteira</summary><div class="corporate-dashboard-grid">'+
+   breakdown('Saldo por faixa de atraso',data.aging,'balance',amounts)+breakdown('Títulos por situação',data.status,'titles',String)+
+   breakdown('Títulos por cobrador',data.collectors,'titles',String)+'</div>'+
+   (financialDetails.length?'<dl class="executive-financial">'+financialDetails.map(([key,label])=>
+    '<div><dt>'+esc(label)+'</dt><dd>'+esc(brl(financial[key]))+'</dd></div>').join('')+'</dl>':'')+'</details>')+'</div>';
  const form=target.querySelector('form');
  form.elements.creditor_id.onchange=()=>{
   const creditor=form.elements.creditor_id.value;
