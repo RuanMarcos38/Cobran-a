@@ -87,7 +87,7 @@ function renderDebtorDirectory(){
  target.innerHTML=`<div class="toolbar">${button('refresh-debtors','Atualizar','refresh')}${button('new','Novo processo','plus')}${['admin','master','supervisor'].includes(state.profile.role)?button('import-photo-cheque','Importar cheque / dívida manual','file'):''}</div><section class="panel"><h2>Devedores</h2><label class="field"><span>Buscar devedor ou credor</span><input id="debtor-directory-search" type="search" value="${esc(state.debtorQuery)}"></label><div id="debtor-directory-results"></div></section>`;
  const search=$('#debtor-directory-search');
  const results=$('#debtor-directory-results');
- const normalize=value=>String(value).normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().trim();
+ const normalize=value=>String(value).normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().trim();
  const render=()=>{
   state.debtorQuery=search.value;
   const query=normalize(search.value);
