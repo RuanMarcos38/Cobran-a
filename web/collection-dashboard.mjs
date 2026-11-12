@@ -154,6 +154,8 @@ export function renderCollectionDashboard({target,data,financial,filters,lookups
   data.changed?'A carteira mudou durante a consulta. Aplique os filtros novamente.':'';
  const activeFilters=Object.entries(filters).some(([key,value])=>value&&(key!=='scope'||value!=='Abertos'));
  target.innerHTML='<div class="corporate-dashboard executive-dashboard">'+
+  '<div class="executive-operations"><div><strong>Operação de cobrança</strong><span>Acompanhe a carteira, os recebimentos e as negociações em andamento.</span></div>'+
+  '<img src="https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&amp;fit=crop&amp;w=900&amp;q=85" alt="" referrerpolicy="no-referrer" width="900" height="300"></div>'+
   '<details class="panel executive-filter"'+(activeFilters||problem?' open':'')+'><summary>Filtrar painel</summary><form class="corporate-dashboard-filters">'+
   select('creditor_id','Carteira / credor',lookups.creditors||[],filters.creditor_id)+select('debtor_id','Devedor',titleOptions,filters.debtor_id)+
   select('assigned_to','Cobrador',lookups.users||[],filters.assigned_to)+select('status','Situação',options(statuses),filters.status)+

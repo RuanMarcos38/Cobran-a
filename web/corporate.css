@@ -171,31 +171,40 @@ html :is(.app-main,.login,dialog) button.primary:hover:not(:disabled){background
 .executive-financial{display:flex;flex-wrap:wrap;gap:20px}.executive-financial dd{margin:4px 0 0;font-weight:700}
 
 
-/* Paleta e composição do painel conforme a referência visual. */
+/* Identidade corporativa da assessoria. */
 :root{
- --institutional:#071637;--institutional-hover:#14244a;
- --canvas:#f5f5fc;--ink:#10132f;--subtle:#4f5470;
- --line:#e8e8f2;--wash:#f5f4fc;--blue:#5633ef;
- --violet:#663cec;--electric:#2679f5;--emerald:#0bae74;--orange:#ff941c;--pink:#ef4d84;
+ --institutional:#0b1d32;--institutional-hover:#162e49;
+ --canvas:#f1f4f8;--surface:#fff;--ink:#122238;--subtle:#495c72;
+ --line:#d7e0ea;--wash:#eaf0f6;--blue:#144e85;--ui-radius:8px;
+ --violet:#4755a3;--electric:#2167ab;--emerald:#177653;--orange:#9a5a1d;--pink:#985570;
+ font-family:Inter,"Segoe UI",Arial,sans-serif;
 }
 html[data-theme=dark]{
- --institutional:#071637;--institutional-hover:#14244a;--canvas:#11152a;
- --surface:#1b2039;--wash:#252945;--ink:#f5f3ff;--subtle:#c2c6df;--line:#333959;--blue:#b6a5ff;
+ --institutional:#0a1728;--institutional-hover:#192d45;
+ --canvas:#101b2a;--surface:#172638;--ink:#ecf2fa;--subtle:#bac9da;
+ --line:#354960;--wash:#23384e;--blue:#91c2f4;
 }
-.sidebar .nav a[data-section].active{background:linear-gradient(100deg,#fb986a,#e75195 49%,#ef547d);color:#15132b}
-.sidebar .nav a[data-section].active:hover{background:linear-gradient(100deg,#ffa87e,#ef68a3 49%,#fb668e)}
-html :is(.app-main,.login,dialog) button.primary,html[data-theme=dark] :is(.app-main,.login,dialog) button.primary{background:#5130e9;border-color:#5130e9;color:#fff}
-html :is(.app-main,.login,dialog) button.primary:hover:not(:disabled){background:#4223cb}
-.executive-main .page-heading{background:transparent}
-.executive-main .topbar{background:var(--canvas)}
-.executive-dashboard{gap:14px}
-.executive-dashboard .panel,.executive-dashboard .metric{border:1px solid var(--line);border-radius:14px;box-shadow:0 3px 12px #20185109}
-.executive-dashboard .executive-metric{padding:16px}
-.executive-metric-icon{color:#fff;background:var(--violet)}
-.executive-metric:nth-child(2) .executive-metric-icon{background:var(--electric)}
-.executive-metric:nth-child(3) .executive-metric-icon{background:var(--emerald)}
-.executive-metric:nth-child(4) .executive-metric-icon{background:var(--orange)}
-.executive-charts{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1.12fr)}
+.sidebar,.sidebar .nav-chevron{transition:none}
+.sidebar .nav a[data-section].active,.sidebar .nav a[data-section].active:hover{background:#1b3a59;color:#fff;box-shadow:inset 3px 0 #d9ac65}
+.app-main :is(.metric,.metric *,.page-heading h1,.page-heading p){animation:none;transition:none}
+.app-main .topbar input::placeholder{color:var(--subtle)}
+.app-main .topbar button{color:var(--ink)}
+.executive-main .page-heading{background:var(--canvas)}
+.executive-main .page-heading h1{font-size:clamp(24px,2.5vw,34px);letter-spacing:-.025em}
+.executive-dashboard{gap:14px;padding-top:0}
+.executive-operations{display:grid;grid-template-columns:1.5fr minmax(0,1fr);min-height:112px;background:#102842;color:#fff;border-radius:8px;overflow:hidden}
+.executive-operations>div{display:grid;gap:6px;align-content:center;padding:16px 22px}
+.executive-operations strong{font-size:19px}
+.executive-operations span{color:#d2deed}
+.executive-operations img{display:block;width:100%;height:100%;max-height:124px;object-fit:cover;object-position:center 45%}
+.executive-dashboard .panel,.executive-dashboard .metric{border:1px solid var(--line);border-radius:8px}
+.executive-dashboard .executive-metric{padding:16px;border-top:3px solid var(--card-accent)}
+.executive-metric:nth-child(1){--card-accent:var(--violet)}
+.executive-metric:nth-child(2){--card-accent:var(--electric)}
+.executive-metric:nth-child(3){--card-accent:var(--emerald)}
+.executive-metric:nth-child(4){--card-accent:var(--orange)}
+.executive-metric-icon{color:#fff;background:var(--card-accent)}
+.executive-charts{grid-template-columns:minmax(0,1.28fr) minmax(0,1fr) minmax(0,1fr)}
 .executive-status-chart>div{display:grid;grid-template-columns:minmax(75px,1fr) minmax(95px,1fr);gap:10px;align-items:center}
 .executive-status-chart svg{width:100%;max-width:155px}
 .executive-status-chart circle{fill:none;stroke:currentColor;stroke-width:16}
@@ -209,9 +218,9 @@ html :is(.app-main,.login,dialog) button.primary:hover:not(:disabled){background
 .status-color-2{color:var(--orange)}
 .status-color-3{color:var(--emerald)}
 .status-color-4{color:var(--pink)}
-.executive-charts .corporate-bars li:nth-child(4n+1) meter::-webkit-meter-optimum-value{background:var(--violet)}
-.executive-charts .corporate-bars li:nth-child(4n+2) meter::-webkit-meter-optimum-value{background:var(--electric)}
-.executive-charts .corporate-bars li:nth-child(4n+3) meter::-webkit-meter-optimum-value{background:var(--orange)}
-.executive-charts .corporate-bars li:nth-child(4n+4) meter::-webkit-meter-optimum-value{background:var(--emerald)}
+.executive-recent :is(th,td){padding:11px 12px}
+.executive-recent tbody tr:nth-child(even) td{background:var(--wash)}
+.executive-recent td:nth-child(4){white-space:nowrap;font-variant-numeric:tabular-nums}
 @media(max-width:1050px){.executive-charts{grid-template-columns:repeat(2,minmax(0,1fr))}.executive-charts>section:last-child{grid-column:1/-1}}
-@media(max-width:680px){.executive-charts{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:680px){.executive-charts{grid-template-columns:minmax(0,1fr)}.executive-operations{grid-template-columns:1fr}.executive-operations img{max-height:92px}}
+@media print{.executive-operations{display:none}}
