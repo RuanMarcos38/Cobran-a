@@ -165,3 +165,35 @@ html[data-theme=dark] .company-details div{background:#1c2838;border-color:#3948
 html[data-theme=dark] .company-details dt{color:#afc3d6}
 .form-grid>.bulk-delete-preview{grid-column:1/-1;min-width:0}.bulk-delete-preview>p{margin:12px 0}.bulk-delete-preview>.table-wrap{max-height:300px;overflow:auto;margin:14px 0}.bulk-delete-preview>label{display:block;margin:12px 0}.bulk-delete-preview>label input{width:100%}
 
+
+/* Cobranças e acordos: ficha compacta do devedor */
+.collection-workspace{min-width:0;padding:18px}
+.collection-head,.collection-controls,.collection-navigation,.collection-list-tools,.collection-selection{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.collection-head{justify-content:space-between;align-items:flex-end;padding-bottom:16px}
+.collection-identity{min-width:0}
+.collection-identity h2{margin:8px 0 2px;font-size:22px;line-height:1.2;overflow-wrap:anywhere}
+.collection-identity p{margin:0;opacity:.8}
+.collection-back,.collection-title-link{border:0;background:transparent;color:var(--blue);text-align:left}
+.collection-back{padding-inline:0}
+.collection-navigation{padding:8px 0;border-block:1px solid var(--line)}
+.collection-navigation button[aria-pressed=true]{border-color:var(--blue);color:var(--blue);font-weight:600}
+.collection-list-tools{justify-content:space-between;padding:12px 0;align-items:flex-start}
+.collection-selection{font-size:12px}
+.collection-workspace summary{cursor:pointer;padding:8px 10px;border:1px solid var(--line);border-radius:5px}
+.collection-workspace summary:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.collection-menu{position:relative}
+.collection-menu>div{position:absolute;z-index:3;inset-inline-end:0;top:calc(100% + 4px);display:grid;gap:4px;min-width:180px;padding:6px;border:1px solid var(--line);border-radius:6px;background:#fff;box-shadow:0 6px 18px #172f4820}
+.collection-menu>div button{justify-content:flex-start;text-align:left;white-space:normal}
+.collection-navigation .collection-menu>div{inset-inline:0 auto}
+.collection-contact[open],.collection-filters[open]{flex-basis:100%}
+.collection-filters form{margin-top:8px}
+.collection-filters>[data-action=search]{margin:8px 0 0}
+.collection-disclosure{margin-block:10px}
+.collection-workspace .table-wrap{margin:0;max-width:100%}
+html[data-theme=dark] .collection-menu>div{background:#1c2838}
+@media(max-width:640px){
+ .collection-workspace{padding:12px}
+ .collection-head{align-items:flex-start}
+ .collection-controls,.collection-selection{width:100%}
+ .collection-identity h2{font-size:18px}
+}
