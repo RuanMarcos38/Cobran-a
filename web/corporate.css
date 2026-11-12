@@ -100,3 +100,21 @@ html :is(.app-main,.login,dialog) :is(button,input,select,textarea,summary,a):fo
  .app-main .page-heading{padding-block:14px 10px}
 }
 @media print{.corporate-stripe,.corporate-dashboard-filters{display:none}}
+
+.collection-hero{position:relative;isolation:isolate;min-height:320px;display:flex;align-items:center;overflow:hidden;border-radius:7px;background:#073630;color:#fff}
+.collection-hero>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 42%;z-index:-2}
+.collection-hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#032723f5 0%,#032723df 46%,#03272349 100%)}
+.collection-hero-copy{padding:34px clamp(22px,4vw,40px);max-width:660px}
+.collection-hero-copy>span{display:inline-block;border:1px solid var(--lime);border-radius:18px;padding:5px 11px;color:var(--lime);text-transform:uppercase;font-size:11px;font-weight:700}
+.collection-hero-copy h2{font-size:clamp(26px,3vw,39px);line-height:1.13;letter-spacing:-.025em;margin:14px 0 12px;color:#fff}
+.collection-hero-copy h2 em{color:var(--lime);font-style:normal}
+.collection-hero-copy p{font-size:14px;line-height:1.65;color:#e4f0e9;margin:0;max-width:490px}
+.collection-hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+.collection-hero-actions a{background:var(--surface);color:var(--ink);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:8px 16px;font-weight:650}
+.collection-hero-actions a:first-child{background:var(--lime);color:#163a34;border-color:var(--lime)}
+.collection-login-layout{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(340px,1fr);align-items:stretch;background:var(--canvas)}
+.collection-hero-login{border-radius:0;min-height:100%}
+.collection-hero-login .collection-hero-copy{padding-inline:clamp(28px,6vw,90px)}
+.collection-login-layout .login{align-self:center;width:min(440px,calc(100% - 32px));max-width:none;margin:28px auto}
+@media(max-width:760px){.collection-login-layout{grid-template-columns:1fr}.collection-hero-login{min-height:240px}.collection-hero-copy{padding-block:26px}.collection-hero{min-height:285px}.collection-hero::before{background:linear-gradient(90deg,#032723f5,#03272390)}}
+@media print{.collection-hero{display:none}}
