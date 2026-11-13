@@ -35,7 +35,7 @@ export function negotiationTitleRows(quote,originals=new Map()){
  return (quote.items||[]).map(item=>{const q=item.quote;return {id:item.id,reference:item.reference,original:originals.get(item.id)?.original_amount,principal:q.principal,due_date:q.due_date,as_of:q.as_of,days:q.days??0,terms:q.terms,interest:q.interest,fine:q.fine,fees:q.fees||0,total:q.total,mode:q.terms?.mode,rate:q.terms?.interest_percent||0,grace:q.terms?.grace_days||0,fee_rate:q.terms?.fee_percent||0,fine_rate:q.terms?.fine_percent||0,contract_terms:q.terms?.contract_terms||q.terms,fee_band:q.terms?.fee_band||'Percentual fixo'};});
 }
 export async function loadNegotiation(api,id){const detail=await api.rpc('detail',{id});detail.debtor=detail.debtor||await api.rpc('get',{entity:'debtors',id:detail.process.debtor_id});const quote=await api.rpc('quote',{id});return {detail,quote};}
-export async function openNegotiation({api,modal,notify,guard,profile,refresh,openPayment,mode='agreement'},id){
+export async function openNegotiation({api,modal,notify,guard,profile,refresh,openPayment,mode='agreement',draftIds=null},id){
  const formalizing=mode==='agreement';
  const canRegisterHistorical=['admin','master','finance'].includes(profile.role);
  const minimumDate=data=>data.historical_agreement_date||today();
@@ -75,6 +75,42 @@ export async function openNegotiation({api,modal,notify,guard,profile,refresh,op
   }
  };
  setDiscountMode();
+ const draftOwner=profile.id||profile.user_id||api.user?.()?.id;
+ const draftKey=draftOwner?'cobranca:simulation:v1:'+draftOwner+':'+[...(draftIds||[id])].sort().join(','):null;
+ let saved;
+ try{if(draftKey)saved=JSON.parse(localStorage.getItem(draftKey));}catch{}
+ const actions=dialog.querySelector('.modal-actions');
+ const draftMessage=document.createElement('span');
+ draftMessage.setAttribute('role','status');
+ actions.prepend(draftMessage);
+ const draftButton=(label,handler)=>{
+  const button=document.createElement('button');button.type='button';button.textContent=label;
+  button.onclick=()=>guard(handler);
+  actions.prepend(button);
+ };
+ if(!formalizing&&draftKey)draftButton('Salvar simulação',()=>{
+  const fields=values();
+  const simulation=simulateNegotiation(quote,fields,limit);
+  if(simulation.schedule.some(row=>row.due_date<minimumDate(fields)))throw Error('Confira os vencimentos anteriores à data-base.');
+  delete fields.accepted;delete fields.reason;
+  localStorage.setItem(draftKey,JSON.stringify({fields,rateOverrides,manualTemplate}));
+  draftMessage.textContent='Simulação salva neste navegador. Abra Gerar acordo para carregar.';
+ });
+ if(saved?.fields)draftButton('Carregar simulação salva',()=>{
+  const {due_dates,installment_amounts,...fields}=saved.fields;
+  for(const [name,value] of Object.entries(fields)){
+   const field=form.elements.namedItem(name);
+   if(field&&typeof value==='string')field.value=value;
+  }
+  manualDates=due_dates;manualAmounts=installment_amounts;
+  manualTemplate=Boolean(saved.manualTemplate);entryVerified=false;
+  Object.keys(rateOverrides).forEach(key=>delete rateOverrides[key]);
+  Object.assign(rateOverrides,saved.rateOverrides||{});
+  setDiscountMode();form.elements.accepted.checked=false;
+  form.querySelectorAll('input[type=date]').forEach(field=>field.dispatchEvent(new Event('calendar-sync')));
+  draw();recalculation.queue();
+  draftMessage.textContent='Simulação carregada. Confira o saldo atualizado e as condições.';
+ });
  const values=()=>({...Object.fromEntries(new FormData(form)),due_dates:manualDates,installment_amounts:manualAmounts});
  function drawTitles(){
   const focused=document.activeElement?.dataset?.rateId?{id:document.activeElement.dataset.rateId,key:document.activeElement.dataset.rateKey}:null;
@@ -171,5 +207,5 @@ export async function openJointNegotiation(ctx,ids){
  const initial=await ctx.api.negotiate('quote',{ids});
  const detail=await ctx.api.rpc('detail',{id:ids[0]});detail.debtor=await ctx.api.rpc('get',{entity:'debtors',id:detail.process.debtor_id});detail.process={...detail.process,external_ref:ids.length+' títulos · proposta conjunta'};
  let first=true;const adapter={...ctx.api,negotiate:undefined,rpc:async(action,payload)=>{if(action==='detail'&&payload.id===ids[0])return detail;if(action==='quote'){if(first){first=false;return initial;}return ctx.api.negotiate('quote',{...payload,ids});}if(action==='agreement')return ctx.api.negotiate('formalize',{...payload,ids});return ctx.api.rpc(action,payload);}};
- return openNegotiation({...ctx,api:adapter},ids[0]);
+ return openNegotiation({...ctx,api:adapter,draftIds:ids},ids[0]);
 }
