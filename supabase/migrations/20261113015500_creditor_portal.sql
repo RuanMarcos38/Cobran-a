@@ -20,7 +20,7 @@ begin
  if not found or not exists(select 1 from public.cobranca_tenants where id=p.tenant_id and active) then raise exception 'Acesso negado'; end if;
  if p.role='creditor' then
   owner_id:=p.creditor_id;
- elsif p.role in ('admin','master','supervisor') then
+ elsif p.role in ('admin','master') then
   owner_id:=nullif(payload->>'creditor_id','')::uuid;
  else raise exception 'Acesso negado'; end if;
  if p.role='creditor' and not coalesce((p.client_access->>'processes')::boolean,false) then raise exception 'Consulta não autorizada'; end if;
@@ -37,6 +37,8 @@ begin
      select l.id,l.created_at,l.channel,l.subject,l.content,b.name as debtor_name
      from public.cobranca_interaction_logs l left join public.cobranca_debtors b on b.id=l.debtor_id and b.tenant_id=p.tenant_id and b.creditor_id=c.id
      where l.tenant_id=p.tenant_id and l.creditor_id=c.id and l.direction in ('inbound','outbound')
+      and (l.debtor_id is null or b.id is not null)
+      and (l.debt_id is null or exists(select 1 from public.cobranca_debts d where d.id=l.debt_id and d.tenant_id=p.tenant_id and d.creditor_id=c.id))
      order by l.created_at desc,l.id desc limit 20
     ) log),'[]'::jsonb) else null end);
  elsif action='creditor_portal_send' then
