@@ -147,7 +147,7 @@ html :is(.app-main,.login,dialog) button.primary:hover:not(:disabled){background
 .executive-filter summary,.executive-details summary{cursor:pointer;font-weight:650;color:var(--blue)}
 .executive-filter form,.executive-details .corporate-dashboard-grid{margin-top:14px}
 .corporate-dashboard.executive-dashboard .executive-metrics{
- grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));
+ grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr)) !important;
  gap:14px;
 }
 .executive-dashboard .executive-metric{
@@ -257,6 +257,7 @@ html :is(.app-main,.login,dialog) button.primary:hover:not(:disabled){background
  white-space:nowrap;
  overflow-wrap:normal;
  overflow-x:auto;
+ scrollbar-width:none;
 }
 .executive-metric-icon{width:32px;height:32px;background:#edf4e1;color:#365b48}
 .negotiation-dialog .form-grid{overflow-anchor:none}
