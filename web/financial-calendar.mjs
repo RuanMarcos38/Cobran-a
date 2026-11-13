@@ -25,7 +25,7 @@ export function proposalDates(proposal,count){
  let dates=proposal.due_dates;if(typeof dates==='string')try{dates=JSON.parse(dates);}catch{throw Error('Cronograma inválido.');}
  if(dates!==undefined&&dates!==null){if(!Array.isArray(dates)||dates.length!==count)throw Error('Confira os vencimentos de todas as parcelas.');dates.forEach(dateParts);if(dates[0]!==proposal.first_due_date)throw Error('O primeiro vencimento deve coincidir com a primeira parcela.');}
  else {if(rule.frequency==='free')throw Error('Escolha os vencimentos das datas livres.');dates=Array.from({length:count},(_,i)=>installmentDueDate(proposal.first_due_date,i,rule.frequency,proposal));}
- for(let i=1;i<dates.length;i++)if(dates[i]<=dates[i-1])throw Error('Os vencimentos devem estar em ordem crescente, sem datas repetidas.');
+ for(let i=1;i<dates.length;i++)if(dates[i]<=dates[i-1])throw Error('A parcela '+(i+1)+' deve vencer depois da parcela '+i+' ('+dates[i-1].split('-').reverse().join('/')+').');
  return dates;
 }
 export function frequencyDescription(s){const r=recurrence(s);return r.frequency==='custom'?'A cada '+r.count+' '+({days:'dia(s)',weeks:'semana(s)',months:'mês(es)'}[r.unit]):paymentFrequencyLabels[r.frequency];}
