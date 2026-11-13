@@ -81,6 +81,27 @@ export async function handleApi(req,res,env=process.env){
  }
  if(operation.startsWith('attend_')){
  const rpc=async(kind,action,payload)=>{const name=kind==='attend'?'cobranca_attendance':kind==='email'?'cobranca_email':kind==='improve'?'cobranca_improvements':'cobranca_app';const r=await fetch(env.SUPABASE_URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:authorization,'Content-Type':'application/json'},body:JSON.stringify({action,payload}),signal:AbortSignal.timeout(20000)});const data=await r.json();if(!r.ok){const error=Error(data.message||'Atendimento não autorizado');error.code=/^[A-Z0-9]{5}$/.test(data.code||'')?data.code:'RPC';error.stage=action;throw error;}return data;};
+ if(operation==='attend_bordero_first_email'){
+ try{
+  const {accounts}=await rpc('attend','accounts',{});
+  const mail=accounts.filter(x=>x.channel==='email'&&x.sector==='collections'&&x.active!==false);
+  if(mail.length!==1){send(409,{error:'É necessária uma conta ativa de e-mail de cobrança.'});return true;}
+  const [account]=mail;
+  await rpc('attend','account_secret',{account_id:account.id});
+  const contacts=await rpc('app','reserve_bordero_first_email',{batch_id:body.batch_id});
+  let accepted=0,unconfirmed=0;
+  for(const contact of contacts){
+   try{
+    const thread=await rpc('attend','thread_open',{account_id:account.id,address:contact.email,name:contact.name});
+    const message=await rpc('attend','message_prepare',{thread_id:thread.id,nonce:contact.debtor_id,subject:'Contato da R&R Estratégia & Performance',content:'Olá! Somos da R&R Estratégia & Performance. Entramos em contato em nome de '+contact.creditor_name+' sobre uma pendência. Você tem interesse em conversar sobre um acordo amigável? Responda a este e-mail para falar com nossa equipe. Se este contato não for o responsável, por favor nos avise.',note:false});
+    await handleAttendance('attend_send',{account_id:account.id,thread_id:thread.id,message_id:message.id},rpc,env);
+    accepted++;
+   }catch{unconfirmed++;}
+  }
+  send(200,{data:{accepted,unconfirmed}});
+ }catch{send(400,{error:'Não foi possível confirmar o primeiro contato. Consulte o atendimento.'});}
+ return true;
+ }
  try{send(200,{data:await handleAttendance(operation,body,rpc,env)});}catch(error){console.error(JSON.stringify({event:'attendance_failure',operation,stage:error.stage||'provider',code:error.code||error.name||'Error'}));send(400,{error:error.public?error.message:'Não foi possível concluir. Confira a conexão e as permissões da conta de atendimento.'});}return true;
  }
  if(['email_status','email_configure','email_preview','email_send','email_history'].includes(operation)){
