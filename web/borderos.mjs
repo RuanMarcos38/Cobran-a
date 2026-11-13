@@ -25,6 +25,12 @@ export async function openBordero({api,creditor_id=null,guard,onImported=async()
     const result=await api.rpc('bordero_import',{creditor_id:selectedCreditor,file_name:preview.file_name,file_hash:preview.file_hash,rows:preview.rows,contract_ref:form.elements.contract.value.trim(),acknowledge_repeated_titles:Boolean(preview.needs_confirmation)});
     preview=null;form.querySelector('.form-grid').hidden=true;button.hidden=true;
     pane.innerHTML=`<p role="status"><strong>Importação concluída:</strong> ${esc(result.created)} títulos criados e ${esc(result.duplicates)} já existentes, sem duplicar ou alterar saldos.</p>`;
+    if(result.created>0){
+     try{
+      const delivery=await api.server('attend_bordero_first_email',{batch_id:result.batch_id});
+      pane.append(Object.assign(document.createElement('p'),{textContent:'Primeiro contato: '+delivery.accepted+' e-mail(s) aceito(s) e '+delivery.unconfirmed+' sem confirmação.'}));
+     }catch(error){pane.append(Object.assign(document.createElement('p'),{textContent:'Borderô salvo. E-mail: '+error.message}));}
+    }
     await onImported();
    }
   }finally{busy=false;button.disabled=false;file.disabled=false;}
