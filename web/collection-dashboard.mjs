@@ -31,7 +31,6 @@ function add(group,key,amount){
 export function summarizeCollection(rows,filters={},asOf=businessDate()){
  const status=new Map(),collectors=new Map(),aging=new Map(),months=new Map(),creditors=new Set(),debtors=new Set();
  for(const label of agingLabels)aging.set(label,{label,titles:0,balance:0});
- const recent=[],priorities=[];
  let titles=0,balance=0,original=0,missingOriginal=0,overdue=0,negotiating=0,broken=0;
  for(const row of rows){
   const bucket=agingBucket(row,asOf);
@@ -39,14 +38,12 @@ export function summarizeCollection(rows,filters={},asOf=businessDate()){
   const amount=cents(row.current_amount);
   titles++;balance+=amount;
   if(row.original_amount==null)missingOriginal++;else original+=cents(row.original_amount);
-  if(['Em negociação','Acordo formalizado','Aguardando pagamento','Parcialmente pago','Acordo descumprido'].includes(row.app_status)&&recent.length<10)recent.push(row);
   if(row.creditor_id)creditors.add(row.creditor_id);
   if(row.debtor_id)debtors.add(row.debtor_id);
   if(row.app_status==='Em negociação')negotiating++;
   if(row.app_status==='Acordo descumprido')broken++;
   if(amount>0&&bucket!==agingLabels[0]&&bucket!==agingLabels[5]&&!['Quitado','Encerrado','Devolvido ao cliente'].includes(row.app_status)){
    overdue+=amount;
-   priorities.push(row);
   }
   add(status,row.app_status||'Sem situação',amount);
   add(collectors,row.collector_name||'Sem cobrador',amount);
@@ -54,8 +51,7 @@ export function summarizeCollection(rows,filters={},asOf=businessDate()){
   const month=dateOnly(row.created_at).slice(0,7);
   if(/^\d{4}-\d{2}$/.test(month))add(months,month,amount);
  }
- priorities.sort((a,b)=>cents(b.current_amount)-cents(a.current_amount)||dateOnly(a.due_date).localeCompare(dateOnly(b.due_date)));
- return {titles,balance,priorities:priorities.slice(0,8),original:missingOriginal?null:original,recent,overdue,negotiating,broken,creditors:creditors.size,debtors:debtors.size,
+ return {titles,balance,original:missingOriginal?null:original,overdue,negotiating,broken,creditors:creditors.size,debtors:debtors.size,
   status:[...status.values()].sort((a,b)=>b.titles-a.titles),aging:[...aging.values()],
   collectors:[...collectors.values()].sort((a,b)=>b.titles-a.titles),
   months:[...months.values()].sort((a,b)=>a.label.localeCompare(b.label)).slice(-12).map(row=>({...row,label:row.label.slice(5)+'/'+row.label.slice(0,4)}))};
@@ -130,18 +126,6 @@ function statusChart(rows){
   '<ul>'+visible.map((row,index)=>'<li><i class="status-color-'+index+'"></i><span>'+esc(row.label)+'</span><strong>'+row.titles+'</strong></li>').join('')+'</ul></div></section>';
 }
 
-function recentNegotiations(rows,lookups,priority=false){
- const columns=['Título','Credor','Devedor','Saldo atualizado','Situação','Responsável'];
- const creditors=new Map((lookups.creditors||[]).map(row=>[row.id,row.name]));
- const debtors=new Map((lookups.debtors||[]).map(row=>[row.id,row.name]));
- return '<section class="panel corporate-dashboard-panel executive-recent"><h3>'+(priority?'Maiores saldos vencidos':'Negociações recentes')+'</h3>'+
-  (rows.length?'<p>'+(priority?'Títulos vencidos ordenados pelo saldo atualizado':'Últimos títulos cadastrados em negociação ou com acordo')+'</p><div class="table-wrap"><table><thead><tr>'+
-   columns.map(label=>'<th scope="col">'+label+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+
-    [row.external_ref,row.creditor_name||creditors.get(row.creditor_id),row.debtor_name||debtors.get(row.debtor_id),
-    brl(row.current_amount),row.app_status,row.collector_name].map((value,index)=>'<td>'+(index===4?'<span class="executive-status">'+esc(value)+'</span>':esc(value??'—'))+'</td>').join('')+
-   '</tr>').join('')+'</tbody></table></div>':'<p>'+(priority?'Nenhum título vencido no recorte selecionado.':'Nenhum título em negociação ou com acordo no recorte selecionado.')+'</p>')+'</section>';
-}
-
 export function renderCollectionDashboard({target,data,financial,filters,lookups,guard,apply,read}){
  const debtors=(lookups.debtors||[]).filter(row=>!filters.creditor_id||row.creditor_id===filters.creditor_id);
  const titleOptions=debtors.map(row=>({id:row.id,name:row.name+' · '+((lookups.creditors||[]).find(c=>c.id===row.creditor_id)?.name||'')+' · '+row.id.slice(-6)}));
@@ -161,8 +145,6 @@ export function renderCollectionDashboard({target,data,financial,filters,lookups
   data.changed?'A carteira mudou durante a consulta. Aplique os filtros novamente.':'';
  const activeFilters=Object.entries(filters).some(([key,value])=>value&&(key!=='scope'||value!=='Abertos'));
  target.innerHTML='<div class="corporate-dashboard executive-dashboard">'+
-  '<div class="executive-operations"><div><strong>Operação de cobrança</strong><span>Acompanhe a carteira, os recebimentos e as negociações em andamento.</span></div>'+
-  '<img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&amp;fit=crop&amp;w=900&amp;q=85" alt="" referrerpolicy="no-referrer" width="900" height="300"></div>'+
   '<details class="panel executive-filter"'+(activeFilters||problem?' open':'')+'><summary>Filtrar painel</summary><form class="corporate-dashboard-filters">'+
   select('creditor_id','Carteira / credor',lookups.creditors||[],filters.creditor_id)+select('debtor_id','Devedor',titleOptions,filters.debtor_id)+
   select('assigned_to','Cobrador',lookups.users||[],filters.assigned_to)+select('status','Situação',options(statuses),filters.status)+
@@ -177,7 +159,6 @@ export function renderCollectionDashboard({target,data,financial,filters,lookups
     metricIcon(icon)+'<div><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong><small>'+esc(description)+'</small></div></article>').join('')+'</div>'+
    '<div class="executive-charts">'+portfolioChart(data.months)+statusChart(data.status)+breakdown('Títulos por cobrador',data.collectors.slice(0,4),'titles',String)+'</div>'+
    breakdown('Saldo por faixa de atraso',data.aging,'balance',amounts)+
-   recentNegotiations(data.priorities,lookups,true)+recentNegotiations(data.recent,lookups)+
    '<details class="panel executive-details"><summary>Detalhamento da carteira</summary><div class="corporate-dashboard-grid">'+
    breakdown('Títulos por situação',data.status,'titles',String)+
    breakdown('Títulos por cobrador',data.collectors,'titles',String)+'</div>'+

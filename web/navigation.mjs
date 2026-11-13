@@ -15,11 +15,11 @@ const previousNavigation=[
  {label:'Comercial',icon:'user',items:[item('Comercial','Prospecção','Prospecção e funil','user',[['Comercial','Funil / Kanban']]),item('Comercial','Atendimento','WhatsApp comercial'),item('Comercial','E-mail comercial'),item('Comercial','Agendamentos','Agenda comercial','calendar')]}
 ];
 const menuSections=[
- ['Painéis e Dashboards','chart',['Dashboard Geral','Painel gerencial','Análise Gerencial','Resultado da Cobrança','Histórico dos clientes','Acompanhamento do credor']],
+ ['Painéis e Dashboards','chart',['Dashboard Geral','Painel gerencial','Análise Gerencial','Resultado da Cobrança','Acompanhamento do credor']],
  ['Operação de Cobrança','file',['Cobrança','Agenda da cobrança','WhatsApp da cobrança','Central de atendimento','Histórico do Processo']],
  ['Carteiras, Processos e Títulos','folder',['Carteiras de credores','Distribuição automática','Títulos Cadastrados','Títulos Captados','Processos do Cliente — Totais']],
  ['Cadastros','user',['Credores / Clientes','Devedores','Minha empresa','Cadastros auxiliares','Usuários']],
- ['Financeiro e Prestação de Contas','money',['Financeiro','Despesas','Contas a pagar','Contas a receber','Faturamento','Crédito','Conciliação bancária','Precificação e Honorários','Simulador financeiro','Fechamento mensal','Comissões comerciais']],
+ ['Financeiro e Prestação de Contas','money',['Financeiro','Histórico dos clientes','Despesas','Contas a pagar','Contas a receber','Faturamento','Crédito','Conciliação bancária','Precificação e Honorários','Simulador financeiro','Fechamento mensal','Comissões comerciais']],
  ['Comercial e Relacionamento','user',['Prospecção','Atendimento','E-mail comercial','Agendamentos','E-mail de Clientes','Clientes Inativos']],
  ['Integrações e Configurações','gear',['Regras de comissão','Integrações / API','Integração n8n','Integrações ERP','Integração bancária / Boletos']]
 ];
