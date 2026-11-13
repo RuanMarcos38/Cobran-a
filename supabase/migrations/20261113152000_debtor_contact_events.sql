@@ -10,7 +10,7 @@ create table cobranca_private.debtor_contact_events (
  created_at timestamptz not null default now(),
  channel text not null check (channel in ('Ligação','E-mail','WhatsApp','Outro')),
  outcome text not null check (outcome in ('Sem resposta','Contato efetivo','Retorno combinado','Promessa de pagamento','Contato inválido')),
- note text not null check (char_length(note) between 1 and 2000),
+ note text not null check (char_length(note) > 0),
  shared boolean not null default false
 );
 alter table cobranca_private.debtor_contact_events enable row level security;
@@ -18,7 +18,7 @@ revoke all on cobranca_private.debtor_contact_events from public,anon,authentica
 create index on cobranca_private.debtor_contact_events(tenant_id,creditor_id,debtor_id,occurred_at desc,id desc);
 create function cobranca_private.debtor_contact_events(action text,payload jsonb)
 returns jsonb language plpgsql security definer set search_path='' as $$
-declare p public.cobranca_profiles; b public.cobranca_debtors; portfolio uuid; debtor uuid; base jsonb;
+declare p public.cobranca_profiles; b public.cobranca_debtors; portfolio uuid; debtor uuid; base jsonb; page_offset integer:=greatest(0,coalesce((payload->>'offset')::integer,0));
 begin
  select * into p from public.cobranca_profiles where id=auth.uid() and active;
  if not found or not exists(select 1 from public.cobranca_tenants where id=p.tenant_id and active) then raise exception 'Acesso negado'; end if;
@@ -52,7 +52,7 @@ begin
   select jsonb_build_object('debtor_contacts',jsonb_build_object(
    'attempts',count(*),'effective',count(*) filter (where outcome in ('Contato efetivo','Retorno combinado','Promessa de pagamento')),
    'rows',coalesce((select jsonb_agg(to_jsonb(r) order by occurred_at desc,id desc) from
-    (select * from visible order by occurred_at desc,id desc limit 50) r),'[]'::jsonb)))
+    (select * from visible order by occurred_at desc,id desc limit 50 offset page_offset) r),'[]'::jsonb)))
   from visible
  );
 end $$;
