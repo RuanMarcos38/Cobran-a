@@ -224,3 +224,19 @@ html[data-theme=dark]{
 @media(max-width:1050px){.executive-charts{grid-template-columns:repeat(2,minmax(0,1fr))}.executive-charts>section:last-child{grid-column:1/-1}}
 @media(max-width:680px){.executive-charts{grid-template-columns:minmax(0,1fr)}.executive-operations{grid-template-columns:1fr}.executive-operations img{max-height:92px}}
 @media print{.executive-operations{display:none}}
+
+/* Identidade do template R&R aplicada aos componentes existentes. */
+:root{--institutional:#121d25;--institutional-hover:#1c2b35;--ink:#18252d;--subtle:#52636b;--line:#e4e8e9;--canvas:#f7f8f8;--surface:#fff;--wash:#edf4e1;--blue:#284c61;--ui-radius:10px;--lime:#c8e57e;font-family:Inter,"Segoe UI",Arial,sans-serif}
+.sidebar .nav a[data-section].active,.sidebar .nav a[data-section].active:hover{background:#2b3b45;box-shadow:inset 3px 0 #c8e57e}
+.sidebar-brand .rr-monogram span{color:#c8e57e}
+.app-main .topbar{background:var(--surface)}
+html :is(.app-main,.login,dialog) button.primary,html[data-theme=dark] :is(.app-main,.login,dialog) button.primary{background:#365b48;border-color:#365b48;color:#fff}
+html :is(.app-main,.login,dialog) button.primary:hover:not(:disabled){background:#294638}
+.executive-operations{background:#1c2b35;grid-template-columns:minmax(0,1fr) minmax(200px,32%);min-height:160px}
+.executive-operations>div{padding:22px 28px}
+.executive-operations img{max-height:190px;filter:saturate(.74)}
+.executive-dashboard .executive-metric{border-top:1px solid var(--line);min-height:105px}
+.executive-dashboard .executive-metric strong{letter-spacing:-.035em;line-height:1.2}
+.executive-metric-icon{background:#edf4e1;color:#365b48}
+.negotiation-dialog .form-grid{overflow-anchor:none}
+@media(max-width:680px){.executive-operations{grid-template-columns:1fr}.executive-operations img{max-height:105px}}

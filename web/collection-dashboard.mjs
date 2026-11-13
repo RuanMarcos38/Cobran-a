@@ -3,7 +3,7 @@ import {brl} from './money.mjs';
 
 export function collectionHero(login=false){
  return `<section class="collection-hero${login?' collection-hero-login':''}" aria-label="Gestão de cobrança">
-  <img src="https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&amp;fit=crop&amp;w=1800&amp;q=85" alt="" referrerpolicy="no-referrer" fetchpriority="high">
+  <img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&amp;fit=crop&amp;w=1800&amp;q=85" alt="" referrerpolicy="no-referrer" fetchpriority="high">
   <div class="collection-hero-copy"><span>Recuperação de crédito</span>
    <h2>Gestão profissional para <em>cobrança</em>, acordos e carteira em aberto</h2>
    <p>Credores, devedores, títulos, contatos, negociações, recebimentos e repasses em uma plataforma.</p>
@@ -155,7 +155,7 @@ export function renderCollectionDashboard({target,data,financial,filters,lookups
  const activeFilters=Object.entries(filters).some(([key,value])=>value&&(key!=='scope'||value!=='Abertos'));
  target.innerHTML='<div class="corporate-dashboard executive-dashboard">'+
   '<div class="executive-operations"><div><strong>Operação de cobrança</strong><span>Acompanhe a carteira, os recebimentos e as negociações em andamento.</span></div>'+
-  '<img src="https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&amp;fit=crop&amp;w=900&amp;q=85" alt="" referrerpolicy="no-referrer" width="900" height="300"></div>'+
+  '<img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&amp;fit=crop&amp;w=900&amp;q=85" alt="" referrerpolicy="no-referrer" width="900" height="300"></div>'+
   '<details class="panel executive-filter"'+(activeFilters||problem?' open':'')+'><summary>Filtrar painel</summary><form class="corporate-dashboard-filters">'+
   select('creditor_id','Carteira / credor',lookups.creditors||[],filters.creditor_id)+select('debtor_id','Devedor',titleOptions,filters.debtor_id)+
   select('assigned_to','Cobrador',lookups.users||[],filters.assigned_to)+select('status','Situação',options(statuses),filters.status)+
