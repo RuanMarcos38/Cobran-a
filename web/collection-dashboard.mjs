@@ -31,7 +31,7 @@ function add(group,key,amount){
 export function summarizeCollection(rows,filters={},asOf=businessDate()){
  const status=new Map(),collectors=new Map(),aging=new Map(),months=new Map(),creditors=new Set(),debtors=new Set();
  for(const label of agingLabels)aging.set(label,{label,titles:0,balance:0});
- const recent=[];
+ const recent=[],priorities=[];
  let titles=0,balance=0,original=0,missingOriginal=0,overdue=0,negotiating=0,broken=0;
  for(const row of rows){
   const bucket=agingBucket(row,asOf);
@@ -44,14 +44,18 @@ export function summarizeCollection(rows,filters={},asOf=businessDate()){
   if(row.debtor_id)debtors.add(row.debtor_id);
   if(row.app_status==='Em negociação')negotiating++;
   if(row.app_status==='Acordo descumprido')broken++;
-  if(bucket!==agingLabels[0]&&bucket!==agingLabels[5])overdue+=amount;
+  if(amount>0&&bucket!==agingLabels[0]&&bucket!==agingLabels[5]&&!['Quitado','Encerrado','Devolvido ao cliente'].includes(row.app_status)){
+   overdue+=amount;
+   priorities.push(row);
+  }
   add(status,row.app_status||'Sem situação',amount);
   add(collectors,row.collector_name||'Sem cobrador',amount);
   add(aging,bucket,amount);
   const month=dateOnly(row.created_at).slice(0,7);
   if(/^\d{4}-\d{2}$/.test(month))add(months,month,amount);
  }
- return {titles,balance,original:missingOriginal?null:original,recent,overdue,negotiating,broken,creditors:creditors.size,debtors:debtors.size,
+ priorities.sort((a,b)=>cents(b.current_amount)-cents(a.current_amount)||dateOnly(a.due_date).localeCompare(dateOnly(b.due_date)));
+ return {titles,balance,priorities:priorities.slice(0,8),original:missingOriginal?null:original,recent,overdue,negotiating,broken,creditors:creditors.size,debtors:debtors.size,
   status:[...status.values()].sort((a,b)=>b.titles-a.titles),aging:[...aging.values()],
   collectors:[...collectors.values()].sort((a,b)=>b.titles-a.titles),
   months:[...months.values()].sort((a,b)=>a.label.localeCompare(b.label)).slice(-12).map(row=>({...row,label:row.label.slice(5)+'/'+row.label.slice(0,4)}))};
@@ -126,19 +130,19 @@ function statusChart(rows){
   '<ul>'+visible.map((row,index)=>'<li><i class="status-color-'+index+'"></i><span>'+esc(row.label)+'</span><strong>'+row.titles+'</strong></li>').join('')+'</ul></div></section>';
 }
 
-function recentNegotiations(rows,lookups){
+function recentNegotiations(rows,lookups,priority=false){
  const columns=['Título','Credor','Devedor','Saldo atualizado','Situação','Responsável'];
  const creditors=new Map((lookups.creditors||[]).map(row=>[row.id,row.name]));
  const debtors=new Map((lookups.debtors||[]).map(row=>[row.id,row.name]));
- return '<section class="panel corporate-dashboard-panel executive-recent"><h3>Negociações recentes</h3>'+
-  (rows.length?'<p>Últimos títulos cadastrados em negociação ou com acordo</p><div class="table-wrap"><table><thead><tr>'+
+ return '<section class="panel corporate-dashboard-panel executive-recent"><h3>'+(priority?'Maiores saldos vencidos':'Negociações recentes')+'</h3>'+
+  (rows.length?'<p>'+(priority?'Títulos vencidos ordenados pelo saldo atualizado':'Últimos títulos cadastrados em negociação ou com acordo')+'</p><div class="table-wrap"><table><thead><tr>'+
    columns.map(label=>'<th scope="col">'+label+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+
     [row.external_ref,row.creditor_name||creditors.get(row.creditor_id),row.debtor_name||debtors.get(row.debtor_id),
     brl(row.current_amount),row.app_status,row.collector_name].map((value,index)=>'<td>'+(index===4?'<span class="executive-status">'+esc(value)+'</span>':esc(value??'—'))+'</td>').join('')+
-   '</tr>').join('')+'</tbody></table></div>':'<p>Nenhum título em negociação ou com acordo no recorte selecionado.</p>')+'</section>';
+   '</tr>').join('')+'</tbody></table></div>':'<p>'+(priority?'Nenhum título vencido no recorte selecionado.':'Nenhum título em negociação ou com acordo no recorte selecionado.')+'</p>')+'</section>';
 }
 
-export function renderCollectionDashboard({target,data,financial,filters,lookups,guard,apply}){
+export function renderCollectionDashboard({target,data,financial,filters,lookups,guard,apply,read}){
  const debtors=(lookups.debtors||[]).filter(row=>!filters.creditor_id||row.creditor_id===filters.creditor_id);
  const titleOptions=debtors.map(row=>({id:row.id,name:row.name+' · '+((lookups.creditors||[]).find(c=>c.id===row.creditor_id)?.name||'')+' · '+row.id.slice(-6)}));
  const scopes=['Abertos','Todos','Encerrados','Suspensos'];
@@ -146,6 +150,9 @@ export function renderCollectionDashboard({target,data,financial,filters,lookups
   ['Carteira total',data.original==null?'—':amounts(data.original),'wallet','Valor original dos títulos no recorte'],
   ['Saldo atualizado',amounts(data.balance),'balance','Saldo dos títulos no recorte'],
   ['Total recuperado',financial?.recovered==null?'—':brl(financial.recovered),'chart','Recebimentos no período do relatório financeiro'],
+  ['Saldo vencido',amounts(data.overdue),'balance','Saldo positivo de títulos vencidos no recorte'],
+  ['Em negociação',data.negotiating,'agreement','Títulos em negociação no recorte'],
+  ['Acordos descumpridos',data.broken,'agreement','Títulos com acordo descumprido no recorte'],
   ['Acordos ativos',financial?.agreements==null?'—':financial.agreements,'agreement','Conforme relatório financeiro']
  ];
  const financialDetails=[['fees','Honorários gerados'],['remittances','Valores a repassar']]
@@ -165,16 +172,58 @@ export function renderCollectionDashboard({target,data,financial,filters,lookups
   input('commercial','Comercial',filters.commercial)+input('carrier','Portador',filters.carrier)+
   '<label>Processos<select name="scope">'+scopes.map(s=>'<option'+(s===(filters.scope||'Abertos')?' selected':'')+'>'+s+'</option>').join('')+'</select></label></div></details>'+
   '<div class="corporate-filter-actions"><button class="primary" type="submit">Aplicar filtros</button><button type="button" data-clear>Limpar filtros</button></div></form>'+'</details>'+
-  (problem?'<p class="notice" role="status">'+esc(problem)+'</p>':
+  '<div data-dashboard-status><span role="status"></span> <button type="button" data-refresh-dashboard>Atualizar agora</button></div><div data-dashboard-results>'+(problem?'<p class="notice" role="status">'+esc(problem)+'</p>':
    '<div class="metrics executive-metrics">'+metrics.map(([label,value,icon,description])=>'<article class="metric executive-metric">'+
     metricIcon(icon)+'<div><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong><small>'+esc(description)+'</small></div></article>').join('')+'</div>'+
    '<div class="executive-charts">'+portfolioChart(data.months)+statusChart(data.status)+breakdown('Títulos por cobrador',data.collectors.slice(0,4),'titles',String)+'</div>'+
-   recentNegotiations(data.recent,lookups)+
+   breakdown('Saldo por faixa de atraso',data.aging,'balance',amounts)+
+   recentNegotiations(data.priorities,lookups,true)+recentNegotiations(data.recent,lookups)+
    '<details class="panel executive-details"><summary>Detalhamento da carteira</summary><div class="corporate-dashboard-grid">'+
-   breakdown('Saldo por faixa de atraso',data.aging,'balance',amounts)+breakdown('Títulos por situação',data.status,'titles',String)+
+   breakdown('Títulos por situação',data.status,'titles',String)+
    breakdown('Títulos por cobrador',data.collectors,'titles',String)+'</div>'+
    (financialDetails.length?'<dl class="executive-financial">'+financialDetails.map(([key,label])=>
-    '<div><dt>'+esc(label)+'</dt><dd>'+esc(brl(financial[key]))+'</dd></div>').join('')+'</dl>':'')+'</details>')+'</div>';
+    '<div><dt>'+esc(label)+'</dt><dd>'+esc(brl(financial[key]))+'</dd></div>').join('')+'</dl>':'')+'</details>')+'</div></div>';
+ const root=target.firstElementChild;
+ const status=root.querySelector('[data-dashboard-status] span');
+ const refreshButton=root.querySelector('[data-refresh-dashboard]');
+ const results=root.querySelector('[data-dashboard-results]');
+ const stamp=()=>new Date().toLocaleTimeString('pt-BR',{timeZone:'America/Sao_Paulo'});
+ let last=stamp(),pending=false;
+ status.textContent=(data.changed||data.tooLarge?'Consulta incompleta':'Atualizado às '+last)+' · atualização automática a cada 30 s';
+ refreshButton.hidden=!read;
+ if(read){
+  const refresh=async()=>{
+   if(pending||!root.isConnected)return;
+   pending=true;
+   refreshButton.disabled=true;
+   try{
+    const next=await read();
+    if(!root.isConnected)return;
+    if(next.data.changed||next.data.tooLarge)throw Error('Consulta incompleta');
+    const staging=document.createElement('div');
+    renderCollectionDashboard({target:staging,...next,filters,lookups,guard,apply});
+    const updated=staging.querySelector('[data-dashboard-results]');
+    if(results.innerHTML!==updated.innerHTML){
+     const expanded=results.querySelector('.executive-details')?.open;
+     results.replaceChildren(...updated.childNodes);
+     const details=results.querySelector('.executive-details');
+     if(details)details.open=Boolean(expanded);
+    }
+    last=stamp();
+    status.textContent='Atualizado às '+last+' · atualização automática a cada 30 s';
+   }catch{
+    status.textContent='Atualização indisponível · última consulta às '+last;
+   }finally{
+    pending=false;
+    refreshButton.disabled=false;
+   }
+  };
+  refreshButton.onclick=()=>void refresh();
+  const timer=setInterval(()=>{
+   if(!root.isConnected)clearInterval(timer);
+   else if(document.visibilityState==='visible')void refresh();
+  },30000);
+ }
  const form=target.querySelector('form');
  form.elements.creditor_id.onchange=()=>{
   const creditor=form.elements.creditor_id.value;
