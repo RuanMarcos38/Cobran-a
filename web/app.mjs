@@ -136,9 +136,15 @@ function debtorEventMarkup(data){
 function mountDebtorEvents(debtor){
  const panel=$('[data-debtor-events]');
  if(!panel)return;
- const refresh=refreshPortalWhileOpen(panel,()=>api.rpc('debtor_contact_events',{id:debtor.id}),data=>{
-  const html=debtorEventMarkup(data.debtor_contacts);
-  if(panel.innerHTML!==html)panel.innerHTML=html;
+ let offset=0;
+ const refresh=refreshPortalWhileOpen(panel,()=>api.rpc('debtor_contact_events',{id:debtor.id,offset}),data=>{
+  const contacts=data.debtor_contacts;
+  const html=debtorEventMarkup(contacts)+'<button type="button" data-history-prev '+(offset===0?'disabled':'')+'>Anterior</button> <span>Página '+(offset/50+1)+'</span> <button type="button" data-history-next '+(offset+50>=contacts.attempts?'disabled':'')+'>Próxima</button>';
+  if(panel.dataset.rendered===html)return;
+  panel.dataset.rendered=html;
+  panel.innerHTML=html;
+  panel.querySelector('[data-history-prev]').onclick=()=>{offset-=50;void refresh();};
+  panel.querySelector('[data-history-next]').onclick=()=>{offset+=50;void refresh();};
  });
  void refresh();
 }
@@ -150,13 +156,11 @@ function openDebtorEvent(debtor){
   select('channel','Canal',['Ligação','E-mail','WhatsApp','Outro'])+
   select('outcome','Resultado',['Sem resposta','Contato efetivo','Retorno combinado','Promessa de pagamento','Contato inválido'])+
   select('shared','Visibilidade',[{id:'false',name:'Nota interna'},{id:'true',name:'Visível ao credor'}],'false')+
-  '<label>Observação<textarea name="note" rows="4" maxlength="2000" required></textarea></label>',
+  '<label>Observação<textarea name="note" rows="4" required></textarea></label>',
   async data=>{
-   const result=await api.rpc('debtor_contact_event_add',{...data,id:debtor.id,occurred_at:new Date(data.occurred_at).toISOString()});
-   const panel=$('[data-debtor-events]');
-   if(panel)panel.innerHTML=debtorEventMarkup(result.debtor_contacts);
+   await api.rpc('debtor_contact_event_add',{...data,id:debtor.id,occurred_at:new Date(data.occurred_at).toISOString()});
    notify('Contato registrado no histórico.');
-  },{reload:false});
+  });
 }
 function renderProcesses(){
  if(!state.activeDebtor){renderDebtorDirectory();return;}
