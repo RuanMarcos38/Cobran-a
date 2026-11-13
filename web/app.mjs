@@ -129,6 +129,39 @@ async function openDebtorContactCard(debtor){
   notify('Contatos salvos. Alteração registrada no histórico.');
  });
 }
+function debtorEventMarkup(data){
+ const rows=data.rows.map(row=>'<article><strong>'+esc(row.debtor_name)+' · '+esc(row.channel)+' · '+esc(row.outcome)+'</strong><small>'+esc(portalTimestamp(row.occurred_at))+' · '+esc(row.actor_name)+(row.shared?'':' · Nota interna')+'</small><p>'+esc(row.note)+'</p></article>').join('');
+ return '<p><strong>'+esc(data.attempts)+'</strong> tentativas · <strong>'+esc(data.effective)+'</strong> contatos efetivos</p><div class="history">'+(rows||'<p>Nenhum contato registrado.</p>')+'</div>';
+}
+function mountDebtorEvents(debtor){
+ const panel=$('[data-debtor-events]');
+ if(!panel)return;
+ let offset=0;
+ const refresh=refreshPortalWhileOpen(panel,()=>api.rpc('debtor_contact_events',{id:debtor.id,offset}),data=>{
+  const contacts=data.debtor_contacts;
+  const html=debtorEventMarkup(contacts)+'<button type="button" data-history-prev '+(offset===0?'disabled':'')+'>Anterior</button> <span>Página '+(offset/50+1)+'</span> <button type="button" data-history-next '+(offset+50>=contacts.attempts?'disabled':'')+'>Próxima</button>';
+  if(panel.dataset.rendered===html)return;
+  panel.dataset.rendered=html;
+  panel.innerHTML=html;
+  panel.querySelector('[data-history-prev]').onclick=()=>{offset-=50;void refresh();};
+  panel.querySelector('[data-history-next]').onclick=()=>{offset+=50;void refresh();};
+ });
+ void refresh();
+}
+function openDebtorEvent(debtor){
+ const now=new Date();
+ const local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ modal('Registrar contato · '+debtor.name,
+  input('occurred_at','Data e hora do contato','datetime-local',local)+
+  select('channel','Canal',['Ligação','E-mail','WhatsApp','Outro'])+
+  select('outcome','Resultado',['Sem resposta','Contato efetivo','Retorno combinado','Promessa de pagamento','Contato inválido'])+
+  select('shared','Visibilidade',[{id:'false',name:'Nota interna'},{id:'true',name:'Visível ao credor'}],'false')+
+  '<label>Observação<textarea name="note" rows="4" required></textarea></label>',
+  async data=>{
+   await api.rpc('debtor_contact_event_add',{...data,id:debtor.id,occurred_at:new Date(data.occurred_at).toISOString()});
+   notify('Contato registrado no histórico.');
+  });
+}
 function renderProcesses(){
  if(!state.activeDebtor){renderDebtorDirectory();return;}
  const role=state.profile.role,debtor=state.activeDebtor;
@@ -159,11 +192,12 @@ function renderProcesses(){
    ${secondaryTabs?`<details class="collection-menu"><summary>${[0,2].includes(state.tab)?'Mais informações':esc(tabs[state.tab])}</summary><div>${secondaryTabs}</div></details>`:''}
    <details class="collection-contact"><summary>Dados do devedor</summary>${button('debtor-contact-card','Editar contatos e ver histórico','file')}<div id="debtor-context" aria-live="polite"></div></details>
   </nav>
+  ${(['admin','master','supervisor','collector'].includes(role)||role==='creditor'&&state.profile.client_access?.history)?`<details class="collection-contact"><summary>Histórico de contatos</summary>${role==='creditor'?'':button('debtor-event-add','Registrar contato','plus')}<div data-debtor-events><p>Carregando histórico…</p></div></details>`:''}
   <div id="tab-content">${state.tab===0?`<div class="collection-list-tools"><details class="collection-filters"><summary>Filtrar títulos</summary>${filterHtml()}${button('search','Aplicar filtros','search','primary')}</details><div class="collection-selection">${button('select-results','Selecionar todos os títulos do devedor','file')}${button('unselect','Limpar seleção','file')}<span data-selection-count>${state.selected.size} título(s) selecionado(s)</span></div></div>${renderTable(processColumns,state.rows)}`:renderDetail()}</div>
  </section>`;
  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.tab=Number(b.dataset.tab);renderProcesses();});
  if($('#filters'))$('#filters').onsubmit=e=>{e.preventDefault();guard(()=>action('search'));};
- bindTable();bindDetail();bindLookups();refreshDebtorContext();
+ bindTable();bindDetail();bindLookups();refreshDebtorContext();mountDebtorEvents(debtor);
 }
 const emailTools=()=>({api,modal,notify,guard,refresh:async()=>{if(state.detail)state.detail=await api.rpc('detail',{id:state.detail.process.id});}});
 function renderDetail(){if(!state.detail)return '<div class="empty"><strong>Abra um título na lista para ver os detalhes do processo.</strong></div>';const d=state.detail;
@@ -197,7 +231,7 @@ function openCreditorAccess(){
  link.append(anchor);
  dialog.querySelector('.form-grid').prepend(link);
 }
-function creditorDashboardMarkup(data,{history,receipts,preview=false}){const metrics=[['Capital original',data.capital==null?'—':brl(data.capital)],['Taxa contratual',data.fee_percent==null?'—':Number(data.fee_percent).toLocaleString('pt-BR',{maximumFractionDigits:4})+'%'],['Acordos firmados',data.agreements_total??'—'],['Títulos cadastrados',data.titles_total],['Títulos em aberto',data.titles_open],['Saldo em aberto',brl(data.outstanding)],['Contatos registrados',!history||data.contacts_total===null?'Acesso não liberado':data.contacts_total],['Títulos contatados',!history||data.titles_contacted===null?'Acesso não liberado':data.titles_contacted],['Títulos negociados',data.titles_negotiated],['Acordos ativos',data.agreements_active]];return `<div class="panel creditor-dashboard"><h3>Acompanhamento da carteira</h3><div class="collection-hero-actions">${preview?'<button type="button" disabled>Ver títulos e contatos por devedor</button>':`<a href="${routeHash('Processo','Cobrança')}">Ver títulos e contatos por devedor</a>`}${receipts?(preview?'<button type="button" disabled>Ver recebimentos</button>':`<a href="${routeHash('Processo','Consulta de Recebimentos')}">Ver recebimentos</a>`):''}</div><p>Informações limitadas à carteira vinculada ao usuário. Contatos seguem as permissões de histórico autorizadas pelo administrador.</p><div class="metrics">${metrics.map(([label,value])=>`<div class="metric"><span>${esc(label)}</span><strong>${esc(value??0)}</strong></div>`).join('')}</div>${history&&Array.isArray(data.recent_contacts)?'<h3>Últimos contatos</h3><div class="history">'+(data.recent_contacts.map(row=>'<article><strong>'+esc(row.debtor_name||row.channel)+'</strong><small>'+esc(portalTimestamp(row.created_at))+' · '+esc(row.channel)+'</small><p>'+esc(row.subject||'')+'</p><p>'+esc(row.content||'')+'</p></article>').join('')||'<p>Nenhum contato registrado.</p>')+'</div>':''}</div>`;}
+function creditorDashboardMarkup(data,{history,receipts,preview=false}){const metrics=[['Capital original',data.capital==null?'—':brl(data.capital)],['Taxa contratual',data.fee_percent==null?'—':Number(data.fee_percent).toLocaleString('pt-BR',{maximumFractionDigits:4})+'%'],['Acordos firmados',data.agreements_total??'—'],['Títulos cadastrados',data.titles_total],['Títulos em aberto',data.titles_open],['Saldo em aberto',brl(data.outstanding)],['Contatos registrados',!history||data.contacts_total===null?'Acesso não liberado':data.contacts_total],['Títulos contatados',!history||data.titles_contacted===null?'Acesso não liberado':data.titles_contacted],['Títulos negociados',data.titles_negotiated],['Acordos ativos',data.agreements_active]];return `<div class="panel creditor-dashboard"><h3>Acompanhamento da carteira</h3><div class="collection-hero-actions">${preview?'<button type="button" disabled>Ver títulos e contatos por devedor</button>':`<a href="${routeHash('Processo','Cobrança')}">Ver títulos e contatos por devedor</a>`}${receipts?(preview?'<button type="button" disabled>Ver recebimentos</button>':`<a href="${routeHash('Processo','Consulta de Recebimentos')}">Ver recebimentos</a>`):''}</div><p>Informações limitadas à carteira vinculada ao usuário. Contatos seguem as permissões de histórico autorizadas pelo administrador.</p><div class="metrics">${metrics.map(([label,value])=>`<div class="metric"><span>${esc(label)}</span><strong>${esc(value??0)}</strong></div>`).join('')}</div>${history&&data.debtor_contacts?'<h3>Histórico compartilhado pelos negociadores</h3>'+debtorEventMarkup(data.debtor_contacts):''}${history&&Array.isArray(data.recent_contacts)?'<h3>Últimos contatos</h3><div class="history">'+(data.recent_contacts.map(row=>'<article><strong>'+esc(row.debtor_name||row.channel)+'</strong><small>'+esc(portalTimestamp(row.created_at))+' · '+esc(row.channel)+'</small><p>'+esc(row.subject||'')+'</p><p>'+esc(row.content||'')+'</p></article>').join('')||'<p>Nenhum contato registrado.</p>')+'</div>':''}</div>`;}
 const portalTimestamp=value=>new Date(value).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'});
 function refreshPortalWhileOpen(node,read,apply){
  let pending=false;
@@ -323,7 +357,7 @@ async function confirmRegistryDeletion(type,rid){
  if(!['admin','master'].includes(state.profile.role))throw Error('Apenas administrador.');
  const check=await api.rpc('registry_delete_preview',{entity:type,id:rid});modal('Conferir exclusão de cadastro',`<p><strong>${esc(check.name)}</strong></p>${check.blocked?'<p role="alert">Exclusão bloqueada. Este cadastro possui títulos, usuários, integrações ou outros vínculos. Preserve o histórico e resolva as referências antes da remoção.</p><ul>'+check.dependencies.map(x=>`<li>${esc(x.table)}: ${esc(x.reason)}</li>`).join('')+'</ul>':'<p>Cadastro sem vínculos encontrados. A exclusão será auditada e exige confirmação.</p>'+input('reason','Motivo da exclusão (mínimo 10 caracteres)')+input('confirmation','Digite EXCLUIR para confirmar')}`,check.blocked?null:async data=>{if(data.confirmation!=='EXCLUIR')throw Error('Digite EXCLUIR.');await api.rpc('registry_delete_commit',{entity:type,id:rid,token:check.token,...data});state.selected.clear();state.lookups=await api.rpc('lookups');notify('Cadastro excluído com auditoria.');});
 }
-async function action(id){if(id==='debtor-contact-card'){const debtor=state.activeDebtor;if(!debtor)throw Error('Selecione um devedor.');return openDebtorContactCard(debtor);}if(id.startsWith('open-title:')){await openRecord(id.slice('open-title:'.length));return;}if(id==='toggle-filters'){const form=$('#filters'),expanded=form.classList.toggle('filters-expanded'),b=form.querySelector('[data-action=toggle-filters]');b.setAttribute('aria-expanded',String(expanded));b.textContent=expanded?'Ocultar filtros avançados':'Filtros avançados';return;}if(id==='refresh-debtors'){state.lookups=await api.rpc('lookups');if(!state.activeDebtor&&state.section==='Cobrança')renderProcesses();return;}if(id==='back-to-debtors'){++loadSequence;debtorContextLoader.clear();state.activeDebtor=null;state.filters={};state.detail=null;state.tab=0;state.page=1;state.selected.clear();renderProcesses();return;}if(id==='select-results'){const debtor=state.activeDebtor;if(!debtor)return;const rows=await loadDebtorTitles(debtor,state.filters,state.sort,state.direction);if(state.activeDebtor!==debtor)return;if(rows.length>1000)throw Error('Refine a consulta para selecionar até 1.000 títulos.');state.selected=new Set(rows.map(row=>row.id));renderProcesses();notify(rows.length+' títulos selecionados. Use Negociar / simular.');return;}if(id==='collection-whatsapp'){await navigate('Processo','WhatsApp da cobrança');return;}
+async function action(id){if(id==='debtor-event-add'&&state.activeDebtor)return openDebtorEvent(state.activeDebtor);if(id==='debtor-contact-card'){const debtor=state.activeDebtor;if(!debtor)throw Error('Selecione um devedor.');return openDebtorContactCard(debtor);}if(id.startsWith('open-title:')){await openRecord(id.slice('open-title:'.length));return;}if(id==='toggle-filters'){const form=$('#filters'),expanded=form.classList.toggle('filters-expanded'),b=form.querySelector('[data-action=toggle-filters]');b.setAttribute('aria-expanded',String(expanded));b.textContent=expanded?'Ocultar filtros avançados':'Filtros avançados';return;}if(id==='refresh-debtors'){state.lookups=await api.rpc('lookups');if(!state.activeDebtor&&state.section==='Cobrança')renderProcesses();return;}if(id==='back-to-debtors'){++loadSequence;debtorContextLoader.clear();state.activeDebtor=null;state.filters={};state.detail=null;state.tab=0;state.page=1;state.selected.clear();renderProcesses();return;}if(id==='select-results'){const debtor=state.activeDebtor;if(!debtor)return;const rows=await loadDebtorTitles(debtor,state.filters,state.sort,state.direction);if(state.activeDebtor!==debtor)return;if(rows.length>1000)throw Error('Refine a consulta para selecionar até 1.000 títulos.');state.selected=new Set(rows.map(row=>row.id));renderProcesses();notify(rows.length+' títulos selecionados. Use Negociar / simular.');return;}if(id==='collection-whatsapp'){await navigate('Processo','WhatsApp da cobrança');return;}
  if(['negotiate','simulate'].includes(id)||id.startsWith('negotiate:')||id.startsWith('simulate:')){const mode=id.startsWith('simulate')?'simulation':'agreement';let target=id.includes(':')?id.slice(id.indexOf(':')+1):null;if(!target){if(state.selected.size===1)target=[...state.selected][0];else if(state.selected.size>1)return openJointNegotiation({api,modal,notify,guard,profile:state.profile,mode,openPayment:openTitlePayment,refresh:async ident=>{state.detail=await api.rpc('detail',{id:ident});state.selected.clear();state.tab=2;}},[...state.selected]);else if(state.tab!==0&&state.detail)target=state.detail.process.id;else throw Error('Selecione um título na lista ou clique em Simular na linha desejada.');}return openNegotiation({api,modal,notify,guard,profile:state.profile,mode,openPayment:openTitlePayment,refresh:async ident=>{state.detail=await api.rpc('detail',{id:ident});state.tab=2;}},target);}
 
  if(id==='menu'){setNavigation();return;}
