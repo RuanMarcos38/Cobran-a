@@ -333,7 +333,7 @@ async function action(id){if(id.startsWith('open-title:')){await openRecord(id.s
   if(id==='duplicate-debtors'){const r=await api.rpc('duplicate_debtors',{});const canDelete=['admin','master'].includes(state.profile.role);const dlg=modal('Possíveis devedores duplicados',r.rows?.length?r.rows.map(g=>`<article class="task"><strong>${esc(g.normalized_name)}</strong><p>${g.duplicates} cadastros para o mesmo credor</p>${g.records.map(x=>`<p>${esc(x.name)} · ${esc(x.document||'Sem documento')} · ${esc(x.titles)} título(s) · ${esc(x.id)} ${canDelete&&Number(x.titles)===0?'<button type="button" data-duplicate-delete="'+esc(x.id)+'">Conferir exclusão</button>':''}</p>`).join('')}</article>`).join(''):'<p>Nenhum nome duplicado na mesma carteira.</p>',null);for(const b of dlg.querySelectorAll('[data-duplicate-delete]'))b.onclick=()=>guard(()=>confirmRegistryDeletion('debtors',b.dataset.duplicateDelete));return;}
   if(id==='creditor-chat'){
   if(state.profile.role==='creditor'){openCreditorChat();return;}
-  if(!['admin','master','supervisor'].includes(state.profile.role)||entity()!=='creditors'||state.selected.size!==1)throw Error('Selecione um credor para abrir o chat.');
+  if(!['admin','master'].includes(state.profile.role)||entity()!=='creditors'||state.selected.size!==1)throw Error('Selecione um credor para abrir o chat.');
   openCreditorChat([...state.selected][0]);return;
  }
  if(id==='creditor-access'){openCreditorAccess();return;}
