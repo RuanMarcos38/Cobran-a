@@ -18,6 +18,7 @@ begin
   join public.cobranca_debtors b on b.id=d.debtor_id and b.tenant_id=d.tenant_id and b.creditor_id=d.creditor_id
   join public.cobranca_creditors c on c.id=d.creditor_id and c.tenant_id=d.tenant_id and c.active
   where d.tenant_id=p.tenant_id and d.metadata->>'bordero_id'=batch::text
+   and d.created_at >= now()-interval '1 hour'
    and not coalesce(b.opt_out,false) and d.current_amount>0 and d.due_date<(now() at time zone 'America/Sao_Paulo')::date
    and b.email ~ '^[^[:space:]@<>;,]+@[^[:space:]@<>;,]+[.][^[:space:]@<>;,]+$'
    and not exists(select 1 from public.cobranca_debtors other where other.tenant_id=b.tenant_id and lower(trim(other.email))=lower(trim(b.email)) and other.id<>b.id)
