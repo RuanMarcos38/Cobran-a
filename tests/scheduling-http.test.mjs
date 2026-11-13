@@ -1,0 +1,18 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import http from 'node:http';import {readFile} from 'node:fs/promises';import {handleApi} from '../api-http.mjs';
+test('schedule API forwards only scoped token, preserves conflict and rejects missing credentials',async()=>{
+ let received;const upstream=http.createServer(async(req,res)=>{let text='';for await(const chunk of req)text+=chunk;received={url:req.url,headers:req.headers,body:JSON.parse(text)};res.setHeader('Content-Type','application/json');res.writeHead(received.body.payload.operation==='conflict'?409:200);res.end(JSON.stringify(received.body.payload.operation==='conflict'?{message:'Conflito de horário',code:'40001'}:{connected:true}));});
+ await new Promise(r=>upstream.listen(0,'127.0.0.1',r));const server=http.createServer((req,res)=>handleApi(req,res,{SUPABASE_URL:`http://127.0.0.1:${upstream.address().port}`,SUPABASE_PUBLISHABLE_KEY:'public-fixture'}));await new Promise(r=>server.listen(0,'127.0.0.1',r));const endpoint=`http://127.0.0.1:${server.address().port}/api/v1/commercial_schedule`;
+ try{assert.equal((await fetch(endpoint,{method:'POST',body:'{}'})).status,401);const headers={'X-Integration-Key':'a'.repeat(64),'Content-Type':'application/json'};const health=await fetch(endpoint,{method:'POST',headers,body:JSON.stringify({operation:'health'})});assert.equal(health.status,200);assert.equal((await health.json()).data.connected,true);assert.equal(received.url,'/rest/v1/rpc/cobranca_schedule');assert.equal(received.body.token,'a'.repeat(64));assert.equal(received.headers.authorization,undefined);const conflict=await fetch(endpoint,{method:'POST',headers,body:JSON.stringify({operation:'conflict'})});assert.equal(conflict.status,409);assert.match((await conflict.json()).error,/Conflito/);
+ }finally{await Promise.all([new Promise(r=>server.close(r)),new Promise(r=>upstream.close(r))]);}
+});
+test('n8n flow validates payload, preserves event identity and reads current version',async()=>{
+ const w=JSON.parse(await readFile(new URL('../workflows/n8n-agendamentos.json',import.meta.url),'utf8'));assert.equal(w.active,false);assert.equal(w.nodes.find(n=>n.type==='n8n-nodes-base.webhook').parameters.authentication,'headerAuth');
+ const validate=new Function('$json',w.nodes.find(n=>n.name==='Validar dados da call').parameters.jsCode);
+ assert.deepEqual(validate({body:{operation:'health'}}),[{json:{operation:'health'}}]);
+ const payload={event_id:'change-1',external_id:'call-1',revision:1,name:'Apresentação',due_at:'2026-10-20T14:00:00-03:00',end_at:'2026-10-20T14:30:00-03:00',status:'Aberto',tenant_id:'forged',headers:{authorization:'secret'}};
+ const normalized=validate({body:payload})[0].json;assert.equal(normalized.external_id,'call-1');assert.equal(normalized.tenant_id,undefined);assert.equal(normalized.headers,undefined);assert.equal(normalized.operation,'upsert');
+ assert.throws(()=>validate({body:{...payload,due_at:'2026-10-20T14:00:00'}}),/fuso/);assert.throws(()=>validate({body:{...payload,revision:0}}));assert.throws(()=>validate({body:{...payload,meeting_url:'javascript:alert(1)'}}));
+ const prepare=new Function('$json','$',w.nodes.find(n=>n.name==='Preparar sincronização').parameters.jsCode);assert.equal(prepare({statusCode:200,body:{data:{appointment:{version:7}}}},()=>({first:()=>({json:normalized})}))[0].json.expected_version,7);
+ assert.throws(()=>prepare({statusCode:401},()=>({first:()=>({json:normalized})})),/rejeitada/);
+ for(const node of w.nodes.filter(n=>n.type==='n8n-nodes-base.httpRequest'))assert.equal(node.parameters.genericAuthType,'httpHeaderAuth');
+});

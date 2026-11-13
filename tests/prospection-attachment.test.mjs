@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import nodemailer from 'nodemailer';
+import {simpleParser} from 'mailparser';
+import {dispatchProspect} from '../prospection-mail.mjs';
+import {handleAttendance} from '../attendance.mjs';
+import {encrypt} from '../email.mjs';
+import {institutionalAsset,institutionalMailbox,loadInstitutionalAttachment} from '../prospection-assets.mjs';
+test('presentation MIME contains the exact institutional PDF once; record follows SMTP acknowledgement',async()=>{
+ const events=[];let sent;
+ const account={id:'mail',tenant_id:'tenant',cipher:'fixture',address:institutionalMailbox};
+ const lead={id:'lead',attempt_id:'attempt',email:'lead@example.invalid',assunto:'Apresentação',mensagem:'Contato de apresentação'};
+ const rpc=async p=>{events.push(p);if(p.operation==='sender')return account;if(p.operation==='claim')return {lead};return {saved:true};};
+ const transport=nodemailer.createTransport({streamTransport:true,buffer:true,newline:'unix'});
+ const result=await dispatchProspect(rpc,{}, {decode:()=>JSON.stringify({address:institutionalMailbox,password:'fixture',smtpHost:'smtp.hostinger.com',imapHost:'imap.hostinger.com'}),createTransport:()=>({verify:async()=>{},sendMail:async mail=>{sent=await transport.sendMail(mail);return {accepted:[lead.email],rejected:[],messageId:sent.messageId};},close:()=>{}})});
+ assert.equal(result.status,'accepted');const parsed=await simpleParser(sent.message);
+ assert.equal(parsed.to.value.length,1);assert.equal(parsed.attachments.length,1);
+ const attachment=parsed.attachments[0];assert.equal(attachment.filename,institutionalAsset.name);assert.equal(attachment.contentType,'application/pdf');assert.equal(attachment.size,institutionalAsset.size);
+ assert.equal(createHash('sha256').update(attachment.content).digest('hex'),institutionalAsset.sha256);
+ assert.equal(parsed.text.trim(),lead.mensagem);assert.deepEqual(events.at(-1).attachments,[{...institutionalAsset,content:undefined}]);
+});
+test('institutional download requires the authorized message, account and acknowledged send',async()=>{
+ const env={EMAIL_ENCRYPTION_KEY:'ab'.repeat(32)};
+ const account={id:'mail',channel:'email',address:institutionalMailbox,cipher:encrypt(JSON.stringify({address:institutionalMailbox}),'tenant:attendance:mail',env)};
+ const message={id:'message',direction:'outbound',status:'accepted',attachments:[institutionalAsset]};
+ const detail={thread:{account_id:'mail'},messages:[message]};
+ const rpc=async(_kind,action)=>action==='profile'?{tenant_id:'tenant',role:'admin'}:action==='account_secret'?account:detail;
+ const body={account_id:'mail',thread_id:'thread',message_id:'message',index:0};
+ const downloaded=await handleAttendance('attend_attachment',body,rpc,env);
+ assert.deepEqual(Buffer.from(downloaded.base64,'base64'),(await loadInstitutionalAttachment()).content);
+ message.status='unknown';await assert.rejects(()=>handleAttendance('attend_attachment',body,rpc,env),/não pertence/);
+ message.status='accepted';detail.thread.account_id='other';await assert.rejects(()=>handleAttendance('attend_attachment',body,rpc,env),/não pertence/);
+});

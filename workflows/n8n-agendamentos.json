@@ -1,0 +1,206 @@
+{
+  "name": "Cobrança · Calls de apresentação · Agenda comercial",
+  "nodes": [
+    {
+      "id": "schedule-webhook",
+      "name": "Receber call confirmada",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "cobranca-calls-comercial",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cobranca-calls-comercial",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "validate",
+      "name": "Validar dados da call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const b=$json.body||$json;\nif(b.operation==='health')return [{json:{operation:'health'}}];\nconst allowed=['event_id','external_id','revision','name','due_at','end_at','status','company','contact_name','contact_email','contact_phone','meeting_url','notes'];\nconst p=Object.fromEntries(allowed.filter(k=>b[k]!==undefined).map(k=>[k,b[k]]));\nfor(const key of ['event_id','external_id','name','due_at','end_at','status'])if(typeof p[key]!=='string'||!p[key].trim())throw new Error('Campo obrigatório: '+key);\nif(!Number.isInteger(p.revision)||p.revision<1)throw new Error('revision deve ser um inteiro positivo, crescente por reunião');\nif(!['Aberto','Concluído','Cancelado'].includes(p.status))throw new Error('Situação inválida');\nfor(const k of ['due_at','end_at'])if(!/(Z|[+-]\\d{2}:\\d{2})$/.test(p[k])||!Number.isFinite(Date.parse(p[k])))throw new Error('Data deve informar fuso horário: '+k);\nif(Date.parse(p.end_at)<=Date.parse(p.due_at))throw new Error('Fim deve ser posterior ao início');\nif(p.meeting_url&&(!p.meeting_url.startsWith('https://')||/\\s/.test(p.meeting_url)))throw new Error('Link da call deve usar HTTPS');\nreturn [{json:{...p,operation:'upsert'}}];"
+      }
+    },
+    {
+      "id": "lookup",
+      "name": "Consultar versão atual",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://r2rmarketingdigital-cobranca.ke4n49.easypanel.host/api/v1/commercial_schedule",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({operation:$json.operation==='health'?'health':'lookup',external_id:$json.external_id}) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "prepare",
+      "name": "Preparar sincronização",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const r=$json;if(r.statusCode!==200)throw new Error('Conexão com a agenda rejeitada: '+r.statusCode);const p=$('Validar dados da call').first().json;return [{json:p.operation==='health'?p:{...p,expected_version:r.body.data.appointment?.version??null}}];"
+      }
+    },
+    {
+      "id": "sync",
+      "name": "Sincronizar agenda comercial",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://r2rmarketingdigital-cobranca.ke4n49.easypanel.host/api/v1/commercial_schedule",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "respond",
+      "name": "Responder resultado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1250,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.body }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      }
+    },
+    {
+      "id": "guide",
+      "name": "Como conectar",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        -400
+      ],
+      "parameters": {
+        "width": 900,
+        "height": 300,
+        "content": "## Calls → Comercial / Agendamentos\n1. Gere a chave na ferramenta em Comercial → Integração n8n.\n2. Crie uma credencial Header Auth (Name: X-Integration-Key; Value: chave). Selecione-a no Webhook e nos dois HTTP Request.\n3. Publique somente depois do teste de conexão. Envie POST ao webhook de produção com o mesmo cabeçalho.\n4. Para testar sem cadastrar dados: {\"operation\":\"health\"}.\n5. Para uma call: event_id único por mudança, external_id estável por reunião, revision crescente, name, due_at/end_at com fuso e status Aberto/Concluído/Cancelado. Campos opcionais: company, contact_name, contact_email, contact_phone, meeting_url, notes.\nReenvios iguais não duplicam. Remarcações e cancelamentos usam o mesmo external_id. Conflitos devem ser tratados pela origem. Este fluxo não envia mensagens nem cria convites no Google Calendar."
+      }
+    }
+  ],
+  "connections": {
+    "Receber call confirmada": {
+      "main": [
+        [
+          {
+            "node": "Validar dados da call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar dados da call": {
+      "main": [
+        [
+          {
+            "node": "Consultar versão atual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar versão atual": {
+      "main": [
+        [
+          {
+            "node": "Preparar sincronização",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar sincronização": {
+      "main": [
+        [
+          {
+            "node": "Sincronizar agenda comercial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sincronizar agenda comercial": {
+      "main": [
+        [
+          {
+            "node": "Responder resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

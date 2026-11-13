@@ -1,0 +1,451 @@
+import {collectionHero,loadCollectionDashboard,renderCollectionDashboard} from './collection-dashboard.mjs';
+import {openAgreementStatement} from './agreement-statement.mjs';
+import {debtorContextMarkup,createDebtorContextLoader} from './debtor-context.mjs';
+import {installDatePickers} from './date-picker.mjs';
+import {navigationGroups,navigationLocation,routeHash,parseRoute} from './navigation.mjs';
+import {openNegotiation,openJointNegotiation} from './negotiation.mjs';
+import {renderAttendance} from './attendance.mjs';
+import {renderCompanyBank} from './company-bank.mjs';
+import {companyForm,companyAutocomplete,consumeCompanyDraft,validateCreditorCharges} from './company.mjs';
+import {installPasswordControls} from './passwords.mjs';
+import {installWindowControls} from './window-controls.mjs';
+import {configureEmail,openEmail,emailHistory} from './email.mjs';
+import {renderPricing,pricingSections} from './pricing.mjs';
+import {renderPortfolios} from './portfolios.mjs';
+import {openBordero} from './borderos.mjs';
+import {openDocumentImport} from './document-import.mjs';
+import {applyTheme} from './theme.mjs';
+import * as api from './api.mjs';
+import {renderSector} from './crm.mjs';
+import {renderFinance,financeSections} from './finance.mjs';
+import {brl,csv,installments,parseCsv} from './money.mjs';
+const $=s=>document.querySelector(s);
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const paths={search:'M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0',folder:'M3 5h7l2 3h9v12H3z',file:'M5 2h10l4 4v16H5zM9 10h6M9 14h6M9 18h4',chart:'M4 21V11h4v10M10 21V6h4v15M16 21V2h4v19',user:'M8 6a4 4 0 1 0 8 0 4 4 0 0 0-8 0M3 22v-3c0-7 18-7 18 0v3z',money:'M2 5h20v14H2zM9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0',close:'M5 5l14 14M19 5L5 19',plus:'M12 3v18M3 12h18',export:'M12 2v13M7 10l5 5 5-5M3 16v6h18v-6',gear:'M12 2l2 4 4-1 1 4 3 3-3 3-1 4-4-1-2 4-2-4-4 1-1-4-3-3 3-3 1-4 4 1zM9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0',bell:'M4 17h16l-2-3V9c0-8-12-8-12 0v5zM9 20h6',refresh:'M20 6v5h-5M4 18v-5h5M20 10a8 8 0 0 0-14-5M4 14a8 8 0 0 0 14 5',calendar:'M3 5h18v17H3zM3 10h18M7 2v6M17 2v6'};
+const icon=n=>`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[n]||paths.file}"/></svg>`;
+const button=(id,label,i='file',cls='')=>{const role=state?.profile?.role;if(role==='creditor'&&((['export','print'].includes(id)&&!clientAllowed('export'))||(id==='receipts'&&!clientAllowed('receipts'))||(id.startsWith('download:')&&!clientAllowed('documents'))||(id==='notifications'&&!clientAllowed('processes'))))return '';if((id==='settings'&&!['admin','master'].includes(role))||(id==='new'&&!(entity()==='users'?canManageUsers():entity()==='appointments'?role!=='creditor':entity()==='expenses'?['admin','master','finance'].includes(role):['admin','master','supervisor'].includes(role))))return '';if(role&&((['payment'].includes(id)&&!['admin','master','finance'].includes(role))||(['distribute','contract','import','import-lista'].includes(id)&&!['admin','master','supervisor'].includes(role))||(role==='creditor'&&['history','status','agreement','document','negotiate'].includes(id))))return '';return `<button data-action="${id}" class="${cls}">${icon(i)}${esc(label)}</button>`;};
+const modules={Atendimento:['Central de atendimento'],Cadastro:['Minha empresa','Credores / Clientes','Devedores','Cadastros auxiliares','Usuários','Regras de comissão','Distribuição automática','Integrações / API'],Processo:['Processo','Cobrança','WhatsApp da cobrança','Carteiras de credores','Consulta de Recebimentos','Agenda da cobrança'],Financeiro:['Recebimentos','Despesas','Honorários e Repasses',...financeSections,...pricingSections],Comercial:['Prospecção','Funil / Kanban','Atendimento','E-mail comercial','Agendamentos','Integração n8n','Comissões comerciais'],Relatórios:['Dashboard Geral','Acompanhamento do credor','Painel gerencial','Financeiro','Títulos Cadastrados','Títulos Captados','Processos do Cliente — Totais','Histórico do Processo','E-mail de Clientes','Clientes Inativos','Análise Gerencial']};
+const roleNames={master:'Administrador principal',admin:'Administrador',supervisor:'Gestor',collector:'Negociador',finance:'Financeiro',creditor:'Cliente',commercial:'Comercial',commercial_manager:'Gestor comercial'};
+const canManageUsers=()=>['admin','master'].includes(state.profile?.role)||(state.profile?.role==='supervisor'&&state.profile.can_manage_users===true);
+const clientPermissions=[['processes','Consultar processos'],['history','Consultar histórico'],['documents','Baixar documentos'],['receipts','Consultar recebimentos'],['reports','Consultar relatórios'],['export','Exportar CSV / imprimir']];
+const tabAllowed=i=>state.profile?.role!=='creditor'||(clientAllowed('processes')&&(![3,5].includes(i)||clientAllowed('history'))&&(i!==4||clientAllowed('documents')));
+const clientAllowed=k=>state.profile?.role!=='creditor'||state.profile.client_access?.[k]===true;
+function visibleSections(m){const role=state.profile?.role;if(m==='Atendimento')return ['admin','master','supervisor','collector','finance'].includes(role)?modules.Atendimento:[];if(['commercial','commercial_manager'].includes(role))return m==='Comercial'?modules.Comercial.filter(s=>s!=='Integração n8n'):[];if(m==='Comercial'&&!['admin','master'].includes(role))return [];if(role==='collector'&&m==='Processo')return ['Cobrança','WhatsApp da cobrança','Agenda da cobrança'];if(role==='collector'){if(m==='Cadastro')return ['Devedores'];if(m==='Processo')return ['Cobrança'];if(m==='Comercial')return ['Agendamentos'];if(m==='Relatórios')return modules[m].filter(s=>!['Financeiro','E-mail de Clientes','Clientes Inativos'].includes(s));return [];}if(role!=='creditor')return modules[m].filter(s=>s!=='Acompanhamento do credor'&&(s!=='WhatsApp da cobrança'||['admin','master','collector'].includes(role))&&(!pricingSections.includes(s)||['admin','master','finance','supervisor'].includes(role))&&(!financeSections.includes(s)||(s==='Integrações ERP'?['admin','master'].includes(role):['admin','master','finance'].includes(role)))&&(s!=='Usuários'||canManageUsers())&&(s!=='Despesas'||['admin','master','finance'].includes(role))&&(!['Regras de comissão','Distribuição automática','Integrações / API'].includes(s)||['admin','master'].includes(role))&&(!['Minha empresa'].includes(s)||['admin','master','finance'].includes(role)));if(m==='Processo')return clientAllowed('processes')?['Cobrança',...(clientAllowed('receipts')?['Consulta de Recebimentos']:[])]:clientAllowed('receipts')?['Consulta de Recebimentos']:[];if(m==='Relatórios')return clientAllowed('processes')?['Acompanhamento do credor',...(clientAllowed('reports')?modules[m].filter(s=>!['Dashboard Geral','Acompanhamento do credor','Financeiro','E-mail de Clientes','Clientes Inativos'].includes(s)&&(s!=='Histórico do Processo'||clientAllowed('history'))):[])]:[];return [];}
+const tabs=['Títulos','Credor','Processo','Histórico','Documentos','Ligações'];
+const financialModes=[{id:'none',name:'Sem juros'},{id:'monthly',name:'Juros simples mensais — mês de 30 dias'},{id:'daily',name:'Juros simples diários'}];
+const statuses=['Novo','Em análise','Aguardando contato','Em cobrança','Em negociação','Acordo formalizado','Aguardando pagamento','Parcialmente pago','Quitado','Acordo descumprido','Suspenso','Devolvido ao cliente','Encerrado'];
+const initialState=()=>({module:'Processo',section:'Cobrança',tab:0,page:1,sort:'created_at',direction:'desc',rows:[],count:0,total:0,selected:new Set(),filters:{},profile:null,detail:null,lookups:{},activeDebtor:null,debtorQuery:'',busy:false});
+let state=initialState();
+function notify(message){$('#message').textContent=message;clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('#message').textContent='',9000);}
+async function guard(fn){try{await fn();}catch(e){if(!api.authenticated()){++loadSequence;state=initialState();document.querySelector('dialog')?.remove();loginView();}notify(e.message);}}
+function field(name,label,type='text',options=null,value=''){return `<label class="field"><span>${esc(label)}</span>${options?`<select name="${name}">${options.map(o=>`<option value="${esc(typeof o==='string'?o:o.id)}" ${String(value)===String(typeof o==='string'?o:o.id)?'selected':''}>${esc(typeof o==='string'?o:o.name)}</option>`).join('')}</select>`:`<input name="${name}" type="${type}" value="${esc(value)}" ${type==='number'?'step="0.01" min="0"':''}>`}</label>`;}
+function loginView(){ $('#app').innerHTML=`<main class="collection-login-layout">${collectionHero(true)}<section class="login"><button type="button" data-theme-toggle></button><h1>Cobrança</h1><p>Equipe de cobrança e área do credor</p>${!api.config.url?'<p class="notice">Configuração do banco pendente. Nenhum dado de demonstração é utilizado.</p>':''}<form id="login"><label>E-mail<input name="email" type="email" autocomplete="username" required></label><label>Senha<input name="password" type="password" autocomplete="current-password" required minlength="8"></label><button class="primary" type="submit">Entrar</button><button type="button" id="register">Criar meu acesso</button><p id="login-error" class="error" role="alert"></p></form><p class="muted">Credor: entre com o e-mail autorizado pela assessoria para acompanhar sua carteira.</p></section></main>`;applyTheme();$('#register').onclick=()=>modal('Criar meu acesso',input('email','E-mail','email')+input('password','Senha (mínimo 12 caracteres)','password'),async data=>{if(data.password.length<12)throw Error('Use uma senha com pelo menos 12 caracteres.');await api.signUp(data.email,data.password);notify('Cadastro solicitado. Confirme o e-mail recebido e depois entre com sua senha.');});$('#login').onsubmit=e=>{e.preventDefault();guard(async()=>{const f=new FormData(e.target);await api.login(f.get('email'),f.get('password'));await start();});};}
+let renderedNavRoute='';let expandedNav='';try{expandedNav=sessionStorage.getItem('cobranca_nav_group')||'';}catch{}
+function syncNavigation(){const desktop=matchMedia('(min-width:769px)').matches,open=desktop?!document.body.classList.contains('sidebar-collapsed'):document.body.classList.contains('menu-open');const b=document.querySelector('[data-action=menu]');if(b){b.setAttribute('aria-expanded',String(open));b.setAttribute('aria-controls','app-sidebar');b.setAttribute('aria-label',open?'Recolher menu lateral':'Abrir menu lateral');b.title=open?'Recolher menu lateral':'Abrir menu lateral';}}
+function setNavigation(open){const desktop=matchMedia('(min-width:769px)').matches;if(desktop){const next=open??document.body.classList.contains('sidebar-collapsed');document.body.classList.toggle('sidebar-collapsed',!next);document.body.classList.remove('menu-open');}else{const next=open??!document.body.classList.contains('menu-open');document.body.classList.toggle('menu-open',next);}syncNavigation();}
+matchMedia('(min-width:769px)').addEventListener('change',()=>{document.body.classList.remove('menu-open');syncNavigation();});
+function shell(){const executive=state.module==='Relatórios'&&state.section==='Dashboard Geral';const groups=navigationGroups((m,s)=>visibleSections(m).includes(s)),location=navigationLocation(state.module,state.section);const targetHash=routeHash(state.module,state.section);if((renderedNavRoute&&renderedNavRoute!==targetHash)||(!renderedNavRoute&&!groups.some(g=>g.label===expandedNav)))expandedNav=location.group;renderedNavRoute=targetHash;try{sessionStorage.setItem('cobranca_nav_group',expandedNav);}catch{}const hash=routeHash(state.module,state.section);if(window.location.hash!==hash)history.pushState(null,'',hash);$('#app').innerHTML=`<aside class="sidebar" id="app-sidebar"><div class="sidebar-brand"><strong class="rr-monogram">R<span>&amp;</span>R</strong><small>Estratégia &amp; Performance</small></div><button type="button" class="sidebar-close" aria-label="Fechar navegação">${icon('close')}</button><nav class="nav" aria-label="Módulos">${groups.map((g,index)=>`<div class="sidebar-group"><button type="button" class="nav-group-toggle" data-nav-group="${esc(g.label)}" aria-expanded="${g.label===expandedNav}" aria-controls="nav-group-${index}">${icon(g.icon)}<span>${esc(g.label)}</span><svg class="nav-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m5 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button><div id="nav-group-${index}" class="sidebar-sections" ${g.label===expandedNav?'':'hidden'}>${g.items.map(i=>`<a href="${routeHash(i.module,i.section)}" data-section="${esc(i.section)}" data-parent="${esc(i.module)}" class="${navigationLocation(state.module,state.section).label===i.label?'active':''}" ${navigationLocation(state.module,state.section).label===i.label?'aria-current="page"':''}>${icon(i.icon)}<span>${esc(i.label)}</span></a>`).join('')}</div></div>`).join('')}</nav></aside><button type="button" class="navigation-backdrop" aria-label="Fechar navegação"></button><div class="app-main${executive?' executive-main':''}"><header class="topbar"><button data-action="menu" aria-label="Abrir ou recolher menu">${icon('folder')}</button><input id="global-search" type="search" placeholder="Buscar cliente, processo, devedor ou documento..." aria-label="Pesquisa global"><button type="button" data-theme-toggle></button>${button('notifications','', 'bell')}${button('settings','', 'gear')}<div class="user-summary"><strong>${esc(state.profile?.name||api.user()?.email)}</strong><small>${esc(roleNames[state.profile?.role]||'')}</small></div>${button('change-password','Minha senha','gear')}${button('logout','Sair','close')}</header><section class="page-heading"><small>${esc(location.group)} › ${esc(location.label)}</small><h1>${executive?'Dashboard Executivo':esc(location.label)}</h1><p>${executive?'Cobrança e recuperação de crédito':state.module==='Comercial'?'Relacionamento comercial, oportunidades e atendimento':state.module==='Processo'?'Consulta e gerenciamento de processos de cobrança':'Gestão da empresa e suas operações'}</p></section><main class="workspace"><div class="workspace-title">${esc(state.section)}</div><div id="content"></div></main><footer class="footer">Usuário: ${esc(state.profile?.name||api.user()?.email)}<span class=profile-label>Perfil: ${esc(roleNames[state.profile?.role]||'')}</span><span class="company">│ Empresa: ${esc(state.profile?.tenant_name||'Não vinculada')}</span><span class="spacer"></span><time>${new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo'}).format(new Date())}</time><span><i class="status-dot"></i> Autenticado</span></footer></div>`;
+  document.querySelectorAll('[data-nav-group]').forEach(b=>b.onclick=()=>{const next=b.getAttribute('aria-expanded')!=='true';document.querySelectorAll('[data-nav-group]').forEach(other=>{const open=other===b&&next;other.setAttribute('aria-expanded',String(open));document.getElementById(other.getAttribute('aria-controls')).hidden=!open;});expandedNav=next?b.dataset.navGroup:'';try{sessionStorage.setItem('cobranca_nav_group',expandedNav);}catch{}});
+  const closeNav=()=>{document.body.classList.remove('menu-open');syncNavigation();};document.querySelector('.sidebar-close').onclick=()=>{setNavigation(false);document.querySelector('[data-action=menu]')?.focus();};document.querySelector('.navigation-backdrop').onclick=closeNav;syncNavigation();
+  document.querySelectorAll('[data-section]').forEach(b=>b.onclick=e=>{if(e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;e.preventDefault();closeNav();guard(()=>navigate(b.dataset.parent,b.dataset.section));});
+  applyTheme();bindActions();$('#global-search').oninput=()=>{clearTimeout(shell.timer);shell.timer=setTimeout(()=>{if(state.module==='Comercial'){const el=$('#crm-search');if(el){el.value=$('#global-search').value;el.dispatchEvent(new Event('input'));}return;}if(!clientAllowed('processes'))return;state.debtorQuery=$('#global-search').value;state.filters={};state.activeDebtor=null;state.selected.clear();state.detail=null;state.tab=0;state.module='Processo';state.section='Cobrança';state.page=1;shell();guard(load);},350);};
+}
+function bindActions(){document.querySelectorAll('[data-action]').forEach(b=>{b.onclick=()=>guard(()=>action(b.dataset.action));b.title=b.textContent.trim()||({notifications:'Notificações',settings:'Configurações'}[b.dataset.action]||'Ação');});}
+async function navigate(module,section,filters={},create=false){if(!visibleSections(module).includes(section))throw Error('Acesso não autorizado.');debtorContextLoader.clear();state.module=module;state.section=section;state.filters=filters;state.activeDebtor=null;state.debtorQuery='';state.tab=0;state.page=1;state.detail=null;state.selected.clear();shell();await load();if(create)entityForm();}
+function entity(){return ({'Credores / Clientes':'creditors',Clientes:'creditors',Devedores:'debtors','Cadastros auxiliares':'auxiliary',Usuários:'users',Despesas:'expenses',Prospecção:'leads',Agendamentos:'appointments','Agenda da cobrança':'appointments'})[state.section];}
+function debtorTitleFilters(debtor,filters){
+ return {...filters,creditor_id:debtor.creditor_id,debtor:debtor.name};
+}
+function belongsToDebtor(row,debtor){
+ return row.debtor_id===debtor.id&&row.creditor_id===debtor.creditor_id;
+}
+async function loadDebtorTitles(debtor,filters,sort,direction){
+ const request={filters:debtorTitleFilters(debtor,filters),sort,direction};
+ const first=await api.rpc('processes',{...request,page:1});
+ const rows=new Map();
+ const collect=result=>{
+  for(const row of result.rows)if(belongsToDebtor(row,debtor))rows.set(row.id,row);
+ };
+ collect(first);
+ const pages=Math.ceil(first.count/25);
+ for(let page=2;page<=pages;page++){
+  const result=await api.rpc('processes',{...request,page});
+  if(!result.rows.length)break;
+  collect(result);
+ }
+ return [...rows.values()];
+}
+function renderDebtorDirectory(){
+ const target=$('#content');
+ const creditorNames=new Map((state.lookups.creditors||[]).map(row=>[row.id,row.name]));
+ const debtors=(state.lookups.debtors||[]).filter(row=>!state.filters.creditor_id||row.creditor_id===state.filters.creditor_id)
+  .map(row=>({...row,creditorName:creditorNames.get(row.creditor_id)||''}))
+  .sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')||a.creditorName.localeCompare(b.creditorName,'pt-BR'));
+ const nameKey=row=>JSON.stringify([row.creditor_id,row.name.trim().toLocaleLowerCase('pt-BR')]);
+ const counts=new Map();
+ for(const row of debtors)counts.set(nameKey(row),(counts.get(nameKey(row))||0)+1);
+ for(const row of debtors)if(counts.get(nameKey(row))>1)row.reference=row.id.slice(-8).toUpperCase();
+ target.innerHTML=`<div class="toolbar">${button('refresh-debtors','Atualizar','refresh')}${button('new','Novo processo','plus')}${['admin','master','supervisor'].includes(state.profile.role)?button('import-photo-cheque','Importar cheque / dívida manual','file'):''}</div><section class="panel"><h2>Devedores</h2><label class="field"><span>Buscar devedor ou credor</span><input id="debtor-directory-search" type="search" value="${esc(state.debtorQuery)}"></label><div id="debtor-directory-results"></div></section>`;
+ const search=$('#debtor-directory-search');
+ const results=$('#debtor-directory-results');
+ const normalize=value=>String(value).normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().trim();
+ const render=()=>{
+  state.debtorQuery=search.value;
+  const query=normalize(search.value);
+  const matches=debtors.filter(row=>normalize(row.name+' '+row.creditorName).includes(query));
+  results.innerHTML=matches.length?`<div class="table-wrap"><table><thead><tr><th>Devedor</th><th>Credor</th></tr></thead><tbody>${matches.map(row=>`<tr><td><button type="button" data-open-debtor="${esc(row.id)}">${esc(row.name)}${row.reference?' · Cadastro '+esc(row.reference):''}</button></td><td>${esc(row.creditorName)}</td></tr>`).join('')}</tbody></table></div>`:'<p>Nenhum devedor encontrado.</p>';
+ };
+ bindActions();
+ search.addEventListener('input',render);
+ results.addEventListener('click',event=>{
+  const button=event.target.closest('[data-open-debtor]');
+  const debtor=button&&debtors.find(row=>row.id===button.dataset.openDebtor);
+  if(!debtor)return;
+  state.activeDebtor=debtor;state.page=1;state.tab=0;state.detail=null;state.selected.clear();
+  guard(load);
+ });
+ render();
+}
+function filterHtml(){const f=state.filters;const opts=kind=>[{id:'',name:'Todos'},...(state.lookups[kind]||[])];return `<form id="filters" class="filters">${field('process','Processo:','text',null,f.process)}${field('client_code','ID.Cliente:','text',null,f.client_code)}${field('group','Grupo de Emp.:','text',null,f.group)}${field('commercial','Comercial:','text',null,f.commercial)}${field('carrier','Portador:','text',null,f.carrier)}${field('assigned_to','Cobrador:','text',opts('users'),f.assigned_to)}${field('start','Dt. Cadastro:','date',null,f.start)}${field('end','Até:','date',null,f.end)}${field('min','Vl. processo de:','number',null,f.min)}${field('max','Até:','number',null,f.max)}${field('status','Situação:','text',['',...statuses],f.status)}${field('scope','Processos:','text',['Abertos','Todos','Encerrados','Suspensos'],f.scope||'Abertos')}${field('payment_start','Dt. Parc.Pgto.:','date',null,f.payment_start)}${field('payment_end','Até:','date',null,f.payment_end)}${field('overdue_min','Vencimento de:','number',null,f.overdue_min)}${field('overdue_max','Até (dias):','number',null,f.overdue_max)}${field('phone','Tel (Sem DDD):','tel',null,f.phone)}${field('return_reason','Mot. Dev.:','text',null,f.return_reason)}${field('inactive_days','Dias sem hist.:','number',null,f.inactive_days)}<button type="button" data-action="toggle-filters" aria-expanded="false">Filtros avançados</button></form>`;}
+const processColumns=[['external_ref','Título'],['current_amount','Saldo atual'],['app_status','Situação'],['collector_name','Cobrador']];
+function renderTable(columns,rows){const isProcess=columns===processColumns;return `<div class="table-wrap"><table><thead><tr><th><input type="checkbox" id="select-all" aria-label="Selecionar página"></th>${columns.map(([k,l])=>`<th><button data-sort="${k}">${esc(l)}${state.sort===k?(state.direction==='asc'?' ↑':' ↓'):''}</button></th>`).join('')}${columns===processColumns&&['admin','master','supervisor','collector','finance'].includes(state.profile.role)?'<th>Negociação</th>':''}</tr></thead>${rows.length?`<tbody>${rows.map(r=>`<tr data-row="${r.id}" class="${state.selected.has(r.id)?'selected':''}"><td><input type="checkbox" data-check="${r.id}" aria-label="Selecionar ${esc(r.external_ref||r.name||r.id)}" ${state.selected.has(r.id)?'checked':''}></td>${columns.map(([k])=>`<td>${isProcess&&k==='external_ref'?`<button class="collection-title-link" data-action="open-title:${esc(r.id)}">${esc(r.external_ref)}</button>`:esc(k.includes('amount')?brl(r[k]):k.endsWith('_at')&&r[k]?new Intl.DateTimeFormat('pt-BR').format(new Date(r[k])):k==='role'?(roleNames[r[k]]||r[k]):['amount','fee_amount','original_amount','current_amount','saldo','valor_original'].includes(k)?brl(r[k]):typeof r[k]==='boolean'?(r[k]?'Sim':'Não'):r[k])}</td>`).join('')}${columns===processColumns&&['admin','master','supervisor','collector','finance'].includes(state.profile.role)?`<td><button data-action="simulate:${r.id}" class="negotiate-row">Simular</button></td>`:''}</tr>`).join('')}</tbody>`:`<tbody><tr><td colspan="${columns.length+1}"><div class="empty">${icon('search')}<strong>Nenhum registro encontrado</strong>Utilize os filtros acima e clique em Consultar para exibir os registros.</div></td></tr></tbody>`}</table><div class="totals"><span>${state.count} registros ${state.total!==null?'│ '+brl(state.total):''}</span><div class="pager">${button('prev','Anterior','folder')}<span>Página ${state.page} de ${Math.max(1,Math.ceil(state.count/25))}</span>${button('next','Próxima','folder')}</div></div></div>`;}
+function bindTable(){if($('#include-removed'))$('#include-removed').onchange=e=>{state.filters.include_removed=e.target.checked;state.selected.clear();guard(load);};document.querySelectorAll('[data-row]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('input,button'))return;guard(()=>openRecord(tr.dataset.row));});document.querySelectorAll('[data-check]').forEach(c=>c.onchange=()=>{c.checked?state.selected.add(c.dataset.check):state.selected.delete(c.dataset.check);c.closest('tr').classList.toggle('selected',c.checked);if($('[data-selection-count]'))$('[data-selection-count]').textContent=state.selected.size+' título(s) selecionado(s)';if($('#debtor-context'))refreshDebtorContext();});if($('#select-all'))$('#select-all').onchange=e=>{document.querySelectorAll('[data-check]').forEach(c=>{c.checked=e.target.checked;c.onchange();});};document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{state.direction=state.sort===b.dataset.sort&&state.direction==='asc'?'desc':'asc';state.sort=b.dataset.sort;guard(load);});bindActions();}
+const debtorContextLoader=createDebtorContextLoader(ids=>api.debtorContext(ids),(data,status)=>{const panel=$('#debtor-context');if(panel)panel.innerHTML=debtorContextMarkup(data,status);});
+function refreshDebtorContext(){const ids=state.tab!==0&&state.detail?.process?[state.detail.process.id]:[...state.selected];debtorContextLoader.update(ids);}
+async function openDebtorContactCard(debtor){
+ const result=await api.rpc('debtor_contact_card',{id:debtor.id});
+ const d=result.details;
+ const fields={email:'E-mail',phone:'Telefone',contact_name:'Responsável pelo contato',contacts:'Contatos adicionais'};
+ const labels={creditor:'Credor',collector:'Negociador',supervisor:'Gestor',admin:'Administrador',master:'Administrador principal'};
+ const log=result.log.map(row=>'<li><strong>'+esc(row.actor_name)+'</strong> · '+esc(labels[row.actor_role]||row.actor_role)+' · '+esc(new Date(row.changed_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}))+'<br>'+esc(row.fields.map(key=>fields[key]||key).join(', '))+'</li>').join('');
+ modal('Contatos do devedor',`<section class="negotiation"><h3>${esc(debtor.name)}</h3>
+  ${input('contact_name',fields.contact_name,'text',d.contact_name,false)}
+  ${input('phone',fields.phone,'tel',d.phone,false)}
+  ${input('email',fields.email,'email',d.email,false)}
+  <label>Contatos adicionais (um por linha)<textarea name="contacts" rows="5" maxlength="3700" placeholder="Nome, telefone ou e-mail">${esc(d.contacts.join('\n'))}</textarea></label>
+  <h3>Histórico de alterações dos contatos</h3>${log?'<ol>'+log+'</ol>':'<p>Nenhuma alteração registrada nesta ficha.</p>'}</section>`,async form=>{
+  const contacts=[...new Set(form.contacts.split(/\r?\n/).map(line=>line.trim()).filter(Boolean))];
+  await api.rpc('debtor_contact_card_save',{...form,id:debtor.id,contacts,expected:d});
+  notify('Contatos salvos. Alteração registrada no histórico.');
+ });
+}
+function debtorEventMarkup(data){
+ const rows=data.rows.map(row=>'<article><strong>'+esc(row.debtor_name)+' · '+esc(row.channel)+' · '+esc(row.outcome)+'</strong><small>'+esc(portalTimestamp(row.occurred_at))+' · '+esc(row.actor_name)+(row.shared?'':' · Nota interna')+'</small><p>'+esc(row.note)+'</p></article>').join('');
+ return '<p><strong>'+esc(data.attempts)+'</strong> tentativas · <strong>'+esc(data.effective)+'</strong> contatos efetivos</p><div class="history">'+(rows||'<p>Nenhum contato registrado.</p>')+'</div>';
+}
+function mountDebtorEvents(debtor){
+ const panel=$('[data-debtor-events]');
+ if(!panel)return;
+ let offset=0;
+ const refresh=refreshPortalWhileOpen(panel,()=>api.rpc('debtor_contact_events',{id:debtor.id,offset}),data=>{
+  const contacts=data.debtor_contacts;
+  const html=debtorEventMarkup(contacts)+'<button type="button" data-history-prev '+(offset===0?'disabled':'')+'>Anterior</button> <span>Página '+(offset/50+1)+'</span> <button type="button" data-history-next '+(offset+50>=contacts.attempts?'disabled':'')+'>Próxima</button>';
+  if(panel.dataset.rendered===html)return;
+  panel.dataset.rendered=html;
+  panel.innerHTML=html;
+  panel.querySelector('[data-history-prev]').onclick=()=>{offset-=50;void refresh();};
+  panel.querySelector('[data-history-next]').onclick=()=>{offset+=50;void refresh();};
+ });
+ void refresh();
+}
+function openDebtorEvent(debtor){
+ const now=new Date();
+ const local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ modal('Registrar contato · '+debtor.name,
+  input('occurred_at','Data e hora do contato','datetime-local',local)+
+  select('channel','Canal',['Ligação','E-mail','WhatsApp','Outro'])+
+  select('outcome','Resultado',['Sem resposta','Contato efetivo','Retorno combinado','Promessa de pagamento','Contato inválido'])+
+  select('shared','Visibilidade',[{id:'false',name:'Nota interna'},{id:'true',name:'Visível ao credor'}],'false')+
+  '<label>Observação<textarea name="note" rows="4" required></textarea></label>',
+  async data=>{
+   await api.rpc('debtor_contact_event_add',{...data,id:debtor.id,occurred_at:new Date(data.occurred_at).toISOString()});
+   notify('Contato registrado no histórico.');
+  });
+}
+function renderProcesses(){
+ if(!state.activeDebtor){renderDebtorDirectory();return;}
+ const role=state.profile.role,debtor=state.activeDebtor;
+ const tabButton=(label,i)=>tabAllowed(i)?`<button type="button" data-tab="${i}" aria-pressed="${state.tab===i}">${label}</button>`:'';
+ const secondaryTabs=tabs.map((label,i)=>i!==0&&i!==2?tabButton(label,i):'').join('');
+ $('#content').innerHTML=`<section class="collection-workspace">
+  <header class="collection-head">
+   <div class="collection-identity">
+    ${button('back-to-debtors','Voltar aos devedores','folder','collection-back')}
+    <h2>${esc(debtor.name)}${debtor.reference?' · Cadastro '+esc(debtor.reference):''}</h2>
+    ${debtor.creditorName?`<p>${esc(debtor.creditorName)}</p>`:''}
+   </div>
+   <div class="collection-controls">
+    ${['admin','master','supervisor','collector','finance'].includes(role)?button('simulate','Simular','file')+button('negotiate','Gerar acordo','money','primary'):''}
+    <details class="collection-menu"><summary>Mais ações</summary><div>
+     ${button('export','Exportar CSV','export')}${button('new','Novo processo','plus')}
+     ${['admin','master','supervisor'].includes(role)?button('import-photo-cheque','Importar cheque / dívida manual','file'):''}
+     ${['admin','master','collector'].includes(role)?button('collection-whatsapp','WhatsApp da cobrança','file'):''}
+     ${['admin','master'].includes(role)?button('email-config','Configurar e-mail','file'):''}
+     ${button('distribute','Distribuir empresa','user')}
+     ${['admin','master'].includes(role)?button('bulk-delete','Excluir títulos em massa','close','danger'):''}
+     ${button('refresh','Atualizar','refresh')}${button('close','Fechar','close')}
+    </div></details>
+   </div>
+  </header>
+  <nav class="collection-navigation" aria-label="Ficha de cobrança">
+   ${tabButton(tabs[0],0)}${tabButton(tabs[2],2)}
+   ${secondaryTabs?`<details class="collection-menu"><summary>${[0,2].includes(state.tab)?'Mais informações':esc(tabs[state.tab])}</summary><div>${secondaryTabs}</div></details>`:''}
+   <details class="collection-contact"><summary>Dados do devedor</summary>${button('debtor-contact-card','Editar contatos e ver histórico','file')}<div id="debtor-context" aria-live="polite"></div></details>
+  </nav>
+  ${(['admin','master','supervisor','collector'].includes(role)||role==='creditor'&&state.profile.client_access?.history)?`<details class="collection-contact"><summary>Histórico de contatos</summary>${role==='creditor'?'':button('debtor-event-add','Registrar contato','plus')}<div data-debtor-events><p>Carregando histórico…</p></div></details>`:''}
+  <div id="tab-content">${state.tab===0?`<div class="collection-list-tools"><details class="collection-filters"><summary>Filtrar títulos</summary>${filterHtml()}${button('search','Aplicar filtros','search','primary')}</details><div class="collection-selection">${button('select-results','Selecionar todos os títulos do devedor','file')}${button('unselect','Limpar seleção','file')}<span data-selection-count>${state.selected.size} título(s) selecionado(s)</span></div></div>${renderTable(processColumns,state.rows)}`:renderDetail()}</div>
+ </section>`;
+ document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.tab=Number(b.dataset.tab);renderProcesses();});
+ if($('#filters'))$('#filters').onsubmit=e=>{e.preventDefault();guard(()=>action('search'));};
+ bindTable();bindDetail();bindLookups();refreshDebtorContext();mountDebtorEvents(debtor);
+}
+const emailTools=()=>({api,modal,notify,guard,refresh:async()=>{if(state.detail)state.detail=await api.rpc('detail',{id:state.detail.process.id});}});
+function renderDetail(){if(!state.detail)return '<div class="empty"><strong>Abra um título na lista para ver os detalhes do processo.</strong></div>';const d=state.detail;
+  if(state.tab===1)return `<div class="panel"><h3>Cliente credor</h3>${details(d.creditor)}${button('client-processes','Consultar carteira','search')}</div>`;
+  if(state.tab===2)return `<div class="panel"><h3>Processo ${esc(d.process.external_ref)}</h3>${financialSummary(d.financial)}<details class="collection-disclosure"><summary>Dados do processo</summary>${details(d.process)}</details><details class="collection-disclosure"><summary>Ações do processo</summary><div class="toolbar">${['admin','master','supervisor','collector','finance'].includes(state.profile.role)?button('email-send','Enviar cobrança por email','file')+button('email-history','Histórico de emails','file'):''}${button('contract','Regra do contrato','file')}${['admin','master'].includes(state.profile.role)?button('title-grace','Carência do título','file'):''}${button('status','Alterar situação','refresh')}${button('history','Registrar atendimento','plus')}${button('agreement','Gerar acordo','money')}${button('payment','Registrar recebimento','money')}${button('document','Adicionar documento','file')}${button('receipts','Recebimentos / estorno','money')}</div></details><details class="collection-disclosure"><summary>Acordos e parcelas</summary>${details(d.agreements)}${['admin','master','supervisor','collector','finance'].includes(state.profile.role)?d.agreements.map(a=>button('agreement-statement:'+a.id,'Demonstrativo do acordo '+a.id,'file')).join(''):''}<h3>Parcelas</h3>${plainTable(d.installments)}</details></div>`;
+  if(state.tab===4)return `<div class="panel">${button('document','Adicionar documento','plus')}<div class="history">${d.documents.map(r=>`<article><strong>${esc(r.name)}</strong> ${button('download:'+r.id,'Baixar','export')}<small>${esc(r.created_at)}</small></article>`).join('')||'Nenhum documento anexado.'}</div></div>`;
+  const logs=state.tab===5?d.history.filter(x=>x.channel==='voice'):d.history;
+  return `<div class="panel">${button('history','Registrar contato','plus')}<div class="history">${logs.map(r=>`<article><strong>${esc(r.subject||r.channel)}</strong><small>${esc(r.created_at)} · ${esc(r.operator_name||'Sistema')}</small><p>${esc(r.content)}</p></article>`).join('')||'Nenhum atendimento registrado.'}</div></div>`;
+}
+function financialSummary(f){if(!f)return '';return `<div class="notice"><strong>Memória de cálculo · ${esc(f.as_of)}</strong><p>Principal: ${brl(f.principal)} · Juros: ${brl(f.interest)} · Multa: ${brl(f.fine)} · Total: ${brl(f.total)}</p>${f.configured?'': '<p>Regra contratual pendente. Configure antes de negociar ou receber.</p>'}${f.frozen?'<p>Encargos incorporados no acordo; saldo do valor negociado.</p>':''}${f.terms?`<p>Juros sobre o principal restante; multa única sobre o principal no primeiro atraso; carência de ${esc(f.terms.grace_days)} dias. Pagamentos abatem juros, multa e principal, nessa ordem. Contrato: ${esc(f.terms.contract_ref||'Sem encargos')}</p>`:''}</div>`;}
+function details(obj){if(Array.isArray(obj))return obj.map(details).join('')||'<p class="muted">Nenhum acordo registrado.</p>';if(!obj)return '';const labels={name:'Nome',document:'CPF/CNPJ',email:'E-mail',phone:'Telefone',external_ref:'Processo',original_amount:'Valor original',current_amount:'Saldo atual',due_date:'Vencimento',app_status:'Situação',contract_ref:'Contrato',total_amount:'Valor negociado',installments:'Parcelas',status:'Status'};return `<div class="detail-grid">${Object.entries(labels).filter(([k])=>obj[k]!==undefined).map(([k,l])=>`<div><small>${l}</small><strong>${esc(k.includes('amount')?brl(obj[k]):obj[k])}</strong></div>`).join('')}</div>`;}
+const tableLabels={name:'Nome',email:'E-mail',active:'Ativo',amount:'Valor',fee_amount:'Honorários',fee_rate:'Taxa (%)',paid_date:'Data do recebimento',reference:'Referência',reversed:'Estornado',created_at:'Cadastro',debt_id:'Identificador do processo',actor:'Operador',reason:'Motivo',installment_id:'Parcela',situacao:'Situação',saldo:'Saldo',processo:'Processo',cliente:'Cliente',devedor:'Devedor',valor_original:'Valor original',data:'Data',canal:'Canal',assunto:'Assunto',descricao:'Descrição',processos:'Processos',bordero:'Borderô',nome:'Nome',ativo:'Ativo'};
+function plainTable(rows){if(!rows.length)return '<p class="muted">Nenhum registro.</p>';const keys=Object.keys(rows[0]).filter(k=>!['id','tenant_id','metadata','payload'].includes(k));return `<div class="table-wrap"><table><thead><tr>${keys.map(k=>`<th>${esc(tableLabels[k]||k)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${keys.map(k=>`<td>${esc(typeof r[k]==='object'?JSON.stringify(r[k]):k==='role'?(roleNames[r[k]]||r[k]):['amount','fee_amount','original_amount','current_amount','saldo','valor_original'].includes(k)?brl(r[k]):typeof r[k]==='boolean'?(r[k]?'Sim':'Não'):r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;}
+function renderEntities(){const type=entity();const cols=type==='users'?[['name','Nome'],['email','E-mail'],['role','Perfil'],['active','Ativo'],['expires_at','Validade do convite']]:type==='expenses'?[['name','Descrição'],['amount','Valor'],['due_date','Vencimento'],['category','Categoria'],['status','Situação']]:type==='appointments'?[['name','Atividade'],['due_at','Agendamento'],['assigned_name','Responsável'],['priority','Prioridade'],['status','Situação']]:type==='leads'?[['name','Empresa'],['document','Documento'],['email','E-mail'],['stage','Etapa'],['phone','Telefone']]:[['name','Nome'],['document','Documento'],['email','E-mail'],['phone','Telefone'],['active','Ativo']];$('#content').innerHTML=`<div class="toolbar">${button('new',type==='users'?'Criar usuário':'Incluir','plus','primary')}${type==='users'?button('user-access:deactivate','Inativar selecionado','user')+button('user-access:archive','Excluir acesso','close')+button('user-access:restore','Restaurar acesso excluído','refresh')+'<label><input type=checkbox id=include-removed '+(state.filters.include_removed?'checked':'')+'> Mostrar excluídos</label>':''}${button('refresh','Consultar','search')}${type==='users'?'':button('export','Exportar CSV','export')}${type==='debtors'?button('import','Importar borderô CSV','file')+button('import-lista','Importar lista de devedores','file')+button('import-photo-debtor','Ler ficha por foto/PDF','file'):type==='creditors'?button('import','Importar CSV','file'):''}${['admin','master'].includes(state.profile.role)&&['creditors','debtors'].includes(type)?(type==='creditors'?button('preview-creditor','Visualizar como cliente','search')+button('creditor-access','Autorizar acesso do credor','users')+button('creditor-chat','Chat do credor','file'):'')+button('delete-registry','Excluir cadastro selecionado','close')+(type==='debtors'?button('duplicate-debtors','Verificar duplicidades','search'):''):''}</div><div class="panel"><label>Pesquisa <input id="entity-search" type="search" value="${esc(state.filters.search||'')}"></label></div>${renderTable(cols,state.rows)}`;$('#entity-search').oninput=e=>{state.filters.search=e.target.value;clearTimeout(renderEntities.timer);renderEntities.timer=setTimeout(()=>{state.page=1;guard(load);},350);};bindTable();}
+const creditorPortalUrl=()=>new URL(routeHash('Relatórios','Acompanhamento do credor'),window.location.href).href;
+function openCreditorAccess(){
+ if(!canManageUsers()||entity()!=='creditors')throw Error('Acesso reservado à gestão de usuários.');
+ if(state.selected.size!==1)throw Error('Selecione um credor para configurar o acesso.');
+ const [creditor_id]=state.selected;
+ const record=state.rows.find(row=>row.id===creditor_id);
+ if(!record)throw Error('Credor não encontrado na lista.');
+ userAccessForm({role:'creditor',creditor_id,name:record.name,email:record.email||'',client_access:{processes:true,history:true}});
+ const dialog=document.querySelector('dialog');
+ for(const name of ['role','creditor_id']){
+  const field=dialog.querySelector('[name="'+name+'"]');
+  for(const option of [...field.options])if(!option.selected)option.remove();
+ }
+ const link=document.createElement('p');
+ const anchor=document.createElement('a');
+ anchor.href=creditorPortalUrl();anchor.target='_blank';anchor.rel='noopener';anchor.textContent='Abrir link da área do credor';
+ link.append(anchor);
+ dialog.querySelector('.form-grid').prepend(link);
+}
+function creditorDashboardMarkup(data,{history,receipts,preview=false}){const metrics=[['Capital original',data.capital==null?'—':brl(data.capital)],['Taxa contratual',data.fee_percent==null?'—':Number(data.fee_percent).toLocaleString('pt-BR',{maximumFractionDigits:4})+'%'],['Acordos firmados',data.agreements_total??'—'],['Títulos cadastrados',data.titles_total],['Títulos em aberto',data.titles_open],['Saldo em aberto',brl(data.outstanding)],['Contatos registrados',!history||data.contacts_total===null?'Acesso não liberado':data.contacts_total],['Títulos contatados',!history||data.titles_contacted===null?'Acesso não liberado':data.titles_contacted],['Títulos negociados',data.titles_negotiated],['Acordos ativos',data.agreements_active]];return `<div class="panel creditor-dashboard"><h3>Acompanhamento da carteira</h3><div class="collection-hero-actions">${preview?'<button type="button" disabled>Ver títulos e contatos por devedor</button>':`<a href="${routeHash('Processo','Cobrança')}">Ver títulos e contatos por devedor</a>`}${receipts?(preview?'<button type="button" disabled>Ver recebimentos</button>':`<a href="${routeHash('Processo','Consulta de Recebimentos')}">Ver recebimentos</a>`):''}</div><p>Informações limitadas à carteira vinculada ao usuário. Contatos seguem as permissões de histórico autorizadas pelo administrador.</p><div class="metrics">${metrics.map(([label,value])=>`<div class="metric"><span>${esc(label)}</span><strong>${esc(value??0)}</strong></div>`).join('')}</div>${history&&data.debtor_contacts?'<h3>Histórico compartilhado pelos negociadores</h3>'+debtorEventMarkup(data.debtor_contacts):''}${history&&Array.isArray(data.recent_contacts)?'<h3>Últimos contatos</h3><div class="history">'+(data.recent_contacts.map(row=>'<article><strong>'+esc(row.debtor_name||row.channel)+'</strong><small>'+esc(portalTimestamp(row.created_at))+' · '+esc(row.channel)+'</small><p>'+esc(row.subject||'')+'</p><p>'+esc(row.content||'')+'</p></article>').join('')||'<p>Nenhum contato registrado.</p>')+'</div>':''}</div>`;}
+const portalTimestamp=value=>new Date(value).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'});
+function refreshPortalWhileOpen(node,read,apply){
+ let pending=false;
+ const refresh=async()=>{
+  if(!node.isConnected||document.visibilityState==='hidden'||pending)return;
+  pending=true;
+  try{const data=await read();if(node.isConnected){apply(data);node.dataset.updated='true';}}
+  catch{if(node.isConnected)node.dataset.updated='false';}
+  finally{pending=false;}
+ };
+ const timer=setInterval(()=>{if(!node.isConnected)clearInterval(timer);else void refresh();},10000);
+ return refresh;
+}
+function openCreditorChat(creditor_id){
+ const payload=creditor_id?{creditor_id}:{};
+ const dialog=modal('Chat com a equipe da carteira','<section class="creditor-chat"><div data-chat-messages aria-live="polite"></div><label>Mensagem<textarea name="body" maxlength="2000" required></textarea></label><button type="button" class="primary" data-chat-send>Enviar mensagem</button><p data-chat-status role="status"></p></section>',null);
+ const log=dialog.querySelector('[data-chat-messages]');
+ const status=dialog.querySelector('[data-chat-status]');
+ const body=dialog.querySelector('[name=body]');
+ const send=dialog.querySelector('[data-chat-send]');
+ let lastId=null;
+ const refresh=refreshPortalWhileOpen(log,()=>api.rpc('creditor_portal_messages',payload),rows=>{
+  if(lastId===(rows.at(-1)?.id??0))return;
+  lastId=rows.at(-1)?.id??0;
+  log.innerHTML=rows.map(row=>'<article><strong>'+esc(row.sender_name)+'</strong> · '+esc(row.staff?'Equipe':'Credor')+' <small>'+esc(portalTimestamp(row.created_at))+'</small><p>'+esc(row.body)+'</p></article>').join('')||'<p>Nenhuma mensagem nesta conversa.</p>';
+ });
+ dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+ send.onclick=()=>guard(async()=>{
+  if(!body.reportValidity())return;
+  send.disabled=true;
+  try{await api.rpc('creditor_portal_send',{...payload,body:body.value});body.value='';status.textContent='Mensagem enviada.';await refresh();}
+  finally{send.disabled=false;}
+ });
+ void refresh();
+}
+function renderCreditorDashboard(data){
+ $('#content').innerHTML='<div class="toolbar">'+button('refresh','Atualizar','refresh','primary')+button('creditor-chat','Chat com a equipe','file')+'</div><div data-live-creditor></div>';
+ const panel=$('[data-live-creditor]');
+ const render=summary=>{panel.innerHTML=creditorDashboardMarkup(summary,{history:clientAllowed('history'),receipts:clientAllowed('receipts')});};
+ render(data);bindActions();
+ refreshPortalWhileOpen(panel,()=>api.rpc('creditor_portal_summary',{}),render);
+}
+async function previewCreditorDashboard(){
+ if(!['admin','master'].includes(state.profile.role)||entity()!=='creditors')throw Error('Prévia disponível em Credores / Clientes para administradores.');
+ if(state.selected.size!==1)throw Error('Selecione um credor para visualizar o painel.');
+ const [creditor_id]=state.selected;
+ const name=state.rows.find(row=>row.id===creditor_id)?.name||'Credor';
+ const data=await api.rpc('creditor_portal_summary',{creditor_id});
+ const dialog=modal('Prévia da área do cliente',`<section><h3>${esc(name)}</h3><p>Prévia do painel de um credor com permissão para consultar processos. As permissões abaixo controlam apenas esta prévia.</p><label><input type="checkbox" data-preview-history> Mostrar histórico</label><label><input type="checkbox" data-preview-receipts> Mostrar recebimentos</label><div data-creditor-preview></div></section>`,null);
+ const section=dialog.querySelector('[data-creditor-preview]').parentElement;
+ section.classList.add('negotiation');
+ const history=section.querySelector('[data-preview-history]');
+ const receipts=section.querySelector('[data-preview-receipts]');
+ const render=()=>{section.querySelector('[data-creditor-preview]').innerHTML=creditorDashboardMarkup(data,{history:history.checked,receipts:receipts.checked,preview:true});};
+ history.onchange=receipts.onchange=render;render();
+}
+function renderReport(data){const aggregate=['Painel gerencial','Análise Gerencial','Resultado da Cobrança'].includes(state.section);const labels={portfolio:'Carteira ativa',outstanding:'Total em cobrança',recovered:'Recuperado no período',active:'Processos ativos',closed:'Processos encerrados',agreements:'Acordos ativos',fees:'Honorários gerados',remittances:'Valores a repassar',overdue:'Valor vencido',no_history:'Sem movimentação',broken:'Acordos descumpridos',promises:'Promessas de pagamento'};$('#content').innerHTML=`<div class="toolbar">${button('refresh','Atualizar','refresh','primary')}${aggregate?'':button('export','Exportar CSV','export')}${button('print','Imprimir / PDF','file')}</div><div class="panel"><form id="report-filter" class="report-tools"><label>De <input name="start" type="date" value="${esc(state.filters.start||'')}"></label><label>Até <input name="end" type="date" value="${esc(state.filters.end||'')}"></label><button class="primary">Aplicar período</button></form><p class="muted">Período aplicado à data do recebimento, do atendimento ou do cadastro, conforme o relatório. Títulos captados considera os títulos recebidos pela integração de borderôs.</p><div class="metrics">${Object.entries(labels).filter(([k])=>state.profile.role!=='collector'||!['fees','remittances'].includes(k)).map(([k,l])=>`<div class="metric"><span>${l}</span><strong>${esc(['portfolio','outstanding','recovered','fees','remittances','overdue'].includes(k)?brl(data.metrics[k]):data.metrics[k]||0)}</strong></div>`).join('')}</div><h3>${esc(state.section)}</h3>${aggregate?'<div class="corporate-dashboard"><ul class="corporate-bars">'+['active','closed','agreements','broken','promises'].filter(key=>data.metrics[key]!=null).map(key=>{const count=Number(data.metrics[key])||0;const max=Math.max(1,...['active','closed','agreements','broken','promises'].map(k=>Number(data.metrics[k])||0));return '<li><div><span>'+esc(labels[key])+'</span><strong>'+esc(count)+'</strong></div><meter min="0" max="'+max+'" value="'+count+'" aria-label="'+esc(labels[key])+'"></meter></li>';}).join('')+'</ul></div>':plainTable(data.rows)}</div>`;$('#report-filter').onsubmit=e=>{e.preventDefault();const filters=Object.fromEntries(new FormData(e.target));if(filters.start&&filters.end&&filters.start>filters.end){notify('A data inicial deve ser anterior à data final.');return;}state.filters=filters;guard(load);};bindActions();}
+
+function bindLookups(){
+ const sources={process:'processes',creditor_id:'creditors',debtor:'debtors',assigned_to:'users',group:'group',commercial:'commercial',carrier:'carrier',return_reason:'return_reason'};
+ Object.entries(sources).forEach(([name,source])=>{
+  const control=document.querySelector(`#filters [name="${name}"]`);if(!control)return;
+  const wrap=document.createElement('span');wrap.className='lookup-control';control.replaceWith(wrap);wrap.append(control);
+  const b=document.createElement('button');b.type='button';b.innerHTML=icon('search');b.setAttribute('aria-label','Pesquisar '+control.closest('label').querySelector('span').textContent.replace(':',''));wrap.append(b);
+  b.onclick=()=>guard(async()=>{
+   let rows;if(source==='processes'){rows=(state.profile.role==='creditor'&&!clientAllowed('export')?(await api.rpc('processes',{filters:{scope:'Todos'}})).rows:await api.rpc('export',{entity:'processes',filters:{scope:'Todos'}})).map(x=>({id:x.external_ref,name:x.external_ref+' — '+x.debtor_name}));}
+   else if(['creditors','debtors','users'].includes(source)){
+     const selectedCreditor=document.querySelector('#filters [name="creditor_id"]')?.value||'';
+     rows=(state.lookups[source]||[]).filter(x=>source!=='debtors'||!selectedCreditor||x.creditor_id===selectedCreditor).map(x=>({id:source==='debtors'?x.name:x.id,name:x.name}));
+     if(source==='debtors')rows=[...new Map(rows.map(x=>[x.id.toLocaleLowerCase('pt-BR'),x])).values()];
+    }
+   else {const result=state.profile.role==='creditor'&&!clientAllowed('export')?(await api.rpc('processes',{filters:{scope:'Todos'}})).rows:await api.rpc('export',{entity:'processes',filters:{scope:'Todos'}});rows=[...new Set(result.map(x=>x[source]).filter(Boolean))].map(x=>({id:x,name:x}));}
+   const dlg=modal('Pesquisar '+control.closest('label').querySelector('span').textContent.replace(':',''),'<label class="lookup-search">Pesquisar<input type="search" autofocus></label><div class="lookup-results"></div>',null);
+   const render=()=>{const q=dlg.querySelector('input').value.toLocaleLowerCase('pt-BR');const list=dlg.querySelector('.lookup-results');list.innerHTML='';rows.filter(x=>x.name.toLocaleLowerCase('pt-BR').includes(q)).forEach(x=>{const item=document.createElement('button');item.type='button';item.textContent=x.name;item.onclick=()=>{control.value=x.id;control.dispatchEvent(new Event('change',{bubbles:true}));dlg.close();control.focus();};list.append(item);});if(!list.children.length)list.textContent='Nenhum registro encontrado.';};dlg.querySelector('input').oninput=render;render();
+  });
+ });
+}
+
+function bindDetail(){bindActions();}
+let loadSequence=0;async function load(){if(state.section==='Central de atendimento'){await renderAttendance({api,modal,guard,notify,channel:'email',sector:'collections'},$('#content'));return;}if(state.section==='WhatsApp da cobrança'){await renderAttendance({api,modal,guard,notify,channel:'whatsapp',sector:'collections'},$('#content'));return;}const seq=++loadSequence;state.busy=true;try{const type=entity();let r;if(state.module==='Relatórios'&&state.section==='Dashboard Geral'){const filters=state.filters;const read=async()=>{const [data,financial]=await Promise.all([loadCollectionDashboard(api,filters),visibleSections('Relatórios').includes('Financeiro')?api.rpc('report',{report:'Financeiro',filters:{start:filters.start,end:filters.end}}).then(result=>result.metrics).catch(()=>null):null]);return {data,financial};};const snapshot=await read();if(seq!==loadSequence)return;renderCollectionDashboard({target:$('#content'),...snapshot,read,filters,lookups:state.lookups,guard,apply:async filters=>{state.filters=filters;await load();}});return;}if(state.section==='Minha empresa'){await renderCompanyBank('Minha empresa',{api,modal,guard,notify},$('#content'));return;}if(state.section==='Carteiras de credores'){await renderPortfolios({api,guard,navigate},$('#content'));return;}if(state.section==='Acompanhamento do credor'){const summary=await api.rpc('creditor_portal_summary',{});if(seq!==loadSequence)return;renderCreditorDashboard(summary);return;}if(financeSections.includes(state.section)){await renderFinance(state.section,{api,modal,guard,notify,navigate},$('#content'));return;}if(state.module==='Comercial'||['Regras de comissão','Distribuição automática','Integrações / API'].includes(state.section)){await renderSector(state.section,{api,modal,guard,notify,navigate},$('#content'));return;}if(pricingSections.includes(state.section)){await renderPricing(state.section,{api,modal,guard,notify},$('#content'));return;}if(type==='users'){r=await api.rpc('team',{operation:'list',include_removed:state.filters.include_removed===true});if(seq!==loadSequence)return;const query=(state.filters.search||'').toLocaleLowerCase('pt-BR');const rows=r.rows.filter(x=>(x.name+' '+x.email).toLocaleLowerCase('pt-BR').includes(query)).sort((a,b)=>String(a[state.sort]??'').localeCompare(String(b[state.sort]??''),'pt-BR')*(state.direction==='asc'?1:-1));state.rows=rows.slice((state.page-1)*25,state.page*25);state.count=rows.length;state.total=null;renderEntities();}else if(type){r=await api.rpc('list',{entity:type,filters:state.filters,page:state.page,sort:state.sort,direction:state.direction});if(seq!==loadSequence)return;state.rows=r.rows;state.count=r.count;state.total=r.total;renderEntities();}else if(state.module==='Processo'&&state.section!=='Consulta de Recebimentos'){const debtor=state.activeDebtor;if(!debtor){renderProcesses();return;}const rows=await loadDebtorTitles(debtor,state.filters,state.sort,state.direction);if(seq!==loadSequence)return;state.count=rows.length;state.total=rows.reduce((sum,row)=>sum+Math.round(Number(row.current_amount??0)*100),0)/100;state.page=Math.min(state.page,Math.max(1,Math.ceil(state.count/25)));state.rows=rows.slice((state.page-1)*25,state.page*25);renderProcesses();}else{r=await api.rpc('report',{report:state.section,filters:state.filters});if(seq!==loadSequence)return;state.rows=r.rows;renderReport(r);}}finally{state.busy=false;}}
+function modal(title,fields,onSubmit,options={}){document.querySelector('dialog')?.remove();const d=document.createElement('dialog');d.innerHTML=`<form><div class="modal-head"><h2>${esc(title)}</h2><button type="button" data-cancel aria-label="Fechar">${icon('close')}</button></div><div class="form-grid">${fields}</div><div class="modal-actions"><button type="button" data-cancel>Cancelar</button>${onSubmit?'<button class="primary" type="submit">Salvar</button>':''}</div></form>`;document.body.append(d);d.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>d.close());if(onSubmit)d.querySelector('form').onsubmit=e=>{e.preventDefault();const b=d.querySelector('[type=submit]');b.disabled=true;guard(async()=>{try{await onSubmit(Object.fromEntries(new FormData(e.target)));d.close();if(options.reload!==false)await load();}finally{b.disabled=false;}});};d.showModal();return d;}
+function input(name,label,type='text',value='',required=true){return `<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${type==='number'?`min="0" step="${['grace_days','installments'].includes(name)?'1':'0.01'}" ${['fee_percent','default_interest','default_fine','interest_percent','fine_percent','discount_percent','discount_limit'].includes(name)?'max="100"':''}`:''}></label>`;}
+function select(name,label,options,value=''){return `<label>${label}<select name="${name}" required>${options.map(o=>`<option value="${esc(typeof o==='string'?o:o.id)}" ${String(value)===String(typeof o==='string'?o:o.id)?'selected':''}>${esc(typeof o==='string'?o:o.name)}</option>`).join('')}</select></label>`;}
+function userAccessForm(record={}){const roles=[{id:'admin',name:'Administrador'},{id:'supervisor',name:'Gestor'},{id:'collector',name:'Negociador'},{id:'finance',name:'Financeiro'},{id:'commercial_manager',name:'Gestor comercial'},{id:'commercial',name:'Comercial'},{id:'creditor',name:'Cliente — acesso limitado'}].filter(r=>state.profile.role!=='supervisor'||['collector','creditor'].includes(r.id));if(record.id&&state.profile.role==='supervisor'&&!['collector','creditor'].includes(record.role)){modal('Usuário protegido','<p>Somente o administrador pode editar gestores e administradores.</p>',null);return;}modal(record.id?'Editar acesso':'Criar usuário','<p>Autorize o e-mail e escolha o perfil. Depois, o usuário abre este sistema, clica em Criar meu acesso e confirma o e-mail para definir seu acesso. A autorização vale por 7 dias.</p>'+input('name','Nome','text',record.name||'')+(record.id&&!record.invitation?'':input('email','E-mail autorizado','email',record.email||''))+select('role','Perfil',roles,record.role||'collector')+select('creditor_id','Cliente (somente portal credor)',[{id:'',name:'Nenhum'},...state.lookups.creditors],record.creditor_id||'')+input('discount_limit','Desconto máximo autorizado (%)','number',record.discount_limit||'0')+select('active','Acesso',[{id:'true',name:'Ativo'},{id:'false',name:'Desativado'}],String(record.active!==false))+(state.profile.role==='supervisor'?'':select('can_manage_users','Gestor pode criar e editar negociadores e clientes',[{id:'false',name:'Não autorizado'},{id:'true',name:'Autorizado'}],String(record.can_manage_users===true)))+'<fieldset><legend>Permissões do perfil Cliente credor</legend><p>Somente dados do cliente vinculado. Estas permissões nunca liberam dados de outra empresa.</p>'+clientPermissions.map(([k,l])=>select('access_'+k,l,[{id:'false',name:'Bloqueado'},{id:'true',name:'Liberado'}],String(record.client_access?.[k]??(k==='processes')))).join('')+'</fieldset>',data=>api.rpc('team',{operation:'save',id:record.id,invitation:record.invitation,...data,can_manage_users:data.role==='supervisor'&&data.can_manage_users==='true',client_access:Object.fromEntries(clientPermissions.map(([k])=>[k,data['access_'+k]==='true']))}));const dlg=document.querySelector('dialog');dlg.querySelector('[name=creditor_id]').required=false;}
+function entityForm(record={}){const type=entity();if(type==='creditors'&&!record.id)record=consumeCompanyDraft()||record;if(type==='users')return userAccessForm(record);const common=input('name',type==='appointments'?'Atividade':'Nome / Razão social','text',record.name||'');let fields=common;
+  if(['debtors','leads'].includes(type))fields+=input('document','CPF/CNPJ','text',record.document||'')+input('email','E-mail','email',record.email||'',false)+input('phone','Telefone','tel',record.phone||'',false)+input('city','Cidade/UF','text',record.city||'',false)+input('address','Endereço','text',record.address||'',false);
+  if(type==='creditors')fields=companyForm(record);
+  if(type==='debtors')fields+=select('creditor_id','Cliente credor',state.lookups.creditors,record.creditor_id)+select('opt_out','Restrição de contato',[{id:'false',name:'Contato autorizado'},{id:'true',name:'Não contatar'}],String(record.opt_out||false));
+  if(type==='expenses')fields+=input('amount','Valor','number',record.amount||'')+input('due_date','Vencimento','date',record.due_date||'')+input('category','Categoria','text',record.category||'')+select('status','Situação',['Pendente','Pago','Estornado'],record.status);
+  if(type==='appointments')fields+=input('due_at','Data e hora','datetime-local',record.due_at?.slice(0,16)||'')+select('assigned_to','Responsável',state.lookups.users,record.assigned_to)+select('priority','Prioridade',['Normal','Alta','Urgente'],record.priority)+select('status','Situação',['Aberto','Concluído','Cancelado'],record.status);
+  if(type==='leads')fields+=select('stage','Etapa',['Prospecção','Contato','Proposta','Negociação','Ganho','Perdido'],record.stage)+input('source','Origem','text',record.source||'',false);
+  if(type==='auxiliary')fields+=select('category','Tipo',['Espécie de título','Grupo de empresas','Ramo de atividade','Motivo de devolução','Situação de cobrança','Equipe','Supervisor','Cobrador','Portador','Carteira','Motivo de encerramento','Categoria financeira','Tipo de contato','Modelo de documento'],record.category);
+  if(record.id&&['creditors','debtors','auxiliary'].includes(type))fields+=select('active','Situação cadastral',[{id:'true',name:'Ativo'},{id:'false',name:'Inativo'}],String(record.active!==false));
+  fields+=input('notes','Observações','text',record.notes||'',false);const dlg=modal(record.id?'Editar registro':'Novo registro',fields,async data=>{if(type==='creditors'){validateCreditorCharges(data);if(!Number.isInteger(Number(data.grace_days))||Number(data.grace_days)>3650)throw Error('A carência deve estar entre 0 e 3.650 dias.');if(data.financial_mode==='none'&&Number(data.default_interest)>0)throw Error('Selecione juros mensais ou diários, ou zere a taxa de juros.');}await api.rpc('save',{entity:type,id:record.id,...data});state.lookups=await api.rpc('lookups');});if(type==='creditors'){companyAutocomplete(dlg,document=>api.improve('company_prefill',{document}),notify);const mode=dlg.querySelector('[name=financial_mode]'),rate=dlg.querySelector('[name=default_interest]');mode.addEventListener('change',()=>{if(mode.value==='none'&&Number(rate.value)>0){rate.value='0';notify('Sem juros: taxa contratual ajustada para 0%.');}});}
+}
+async function openRecord(id){if(entity()==='users'){entityForm(state.rows.find(x=>x.id===id));return;}if(entity()){const r=await api.rpc('get',{entity:entity(),id});if(state.profile.role==='collector'&&entity()==='debtors'){await openDebtorContactCard(r);return;}entityForm(r);return;}state.detail=await api.rpc('detail',{id});state.tab=2;renderProcesses();}
+function newProcess(){const dlg=modal('Novo processo',input('external_ref','Número do processo')+select('creditor_id','Cliente credor',state.lookups.creditors)+select('debtor_id','Devedor',state.lookups.debtors)+input('original_amount','Valor original','number')+input('due_date','Vencimento','date')+input('contract_ref','Contrato','text','',false)+select('assigned_to','Cobrador',state.lookups.users)+input('team','Equipe','text','',false)+input('supervisor','Supervisor','text','',false)+input('carrier','Portador','text','',false)+input('commercial','Comercial','text','',false)+select('financial_mode','Periodicidade contratual',financialModes)+input('grace_days','Carência em dias','number','0')+input('interest_percent','Juros por período (%)','number','0')+input('fine_percent','Multa (%)','number','0')+input('notes','Observações','text','',false),async data=>{await api.rpc('new_process',data);state.lookups=await api.rpc('lookups');});const creditor=dlg.querySelector('[name=creditor_id]'),debtor=dlg.querySelector('[name=debtor_id]');const update=()=>{const rows=state.lookups.debtors.filter(x=>x.creditor_id===creditor.value);debtor.innerHTML=rows.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('');};const applyContract=()=>{update();const c=state.lookups.creditors.find(x=>x.id===creditor.value);for(const [name,value] of Object.entries({financial_mode:c?.financial_mode||'monthly',interest_percent:c?.default_interest??'1',fine_percent:c?.default_fine??'2',grace_days:c?.grace_days||'0'}))dlg.querySelector(`[name=${name}]`).value=value;};creditor.onchange=applyContract;applyContract();}
+function openPayment(d){
+ const {process,fee_contract_id:contractId}=d;
+ const fields='<p>Título '+esc(process.external_ref)+'</p><div id="payment-quote">'+financialSummary(d.financial)+'</div>'
+  +select('allocation','Aplicar pagamento',[{id:'standard',name:'Baixa padrão'},{id:'principal',name:'Abater diretamente do capital'}])
+  +input('amount','Valor recebido','number')+input('reference','Referência única da transação')
+  +input('paid_date','Data do recebimento','date')+input('reason','Descrição / comprovação');
+ const reconciliation=contractId?input('origin','Origem da transação (banco / provedor)','text','manual')
+  +select('confirmed','Recebimento confirmado',[{id:'false',name:'Pendente'},{id:'true',name:'Confirmado'}])
+  +select('reconciled','Valor conciliado e alocado a este título',[{id:'false',name:'Pendente'},{id:'true',name:'Conciliado'}]):'';
+ const dlg=modal('Dar baixa no pagamento',fields+reconciliation,async data=>{
+  await api.rpc(contractId?'pricing_payment':'payment',{id:process.id,...data,...(contractId?{contract_id:contractId,transaction_id:data.reference}:{})});
+  state.detail=await api.rpc('detail',{id:process.id});
+  state.tab=2;
+ });
+ let quoteSequence=0;
+ dlg.querySelector('[name=paid_date]').onchange=()=>guard(async()=>{
+  const seq=++quoteSequence,as_of=dlg.querySelector('[name=paid_date]').value;
+  if(!as_of)return;
+  const quote=await api.rpc('quote',{id:process.id,as_of});
+  if(seq===quoteSequence)dlg.querySelector('#payment-quote').innerHTML=financialSummary(quote);
+ });
+ return dlg;
+}
+async function openTitlePayment(id){return openPayment(await api.rpc('detail',{id}));}
+async function confirmRegistryDeletion(type,rid){
+ if(!['admin','master'].includes(state.profile.role))throw Error('Apenas administrador.');
+ const check=await api.rpc('registry_delete_preview',{entity:type,id:rid});modal('Conferir exclusão de cadastro',`<p><strong>${esc(check.name)}</strong></p>${check.blocked?'<p role="alert">Exclusão bloqueada. Este cadastro possui títulos, usuários, integrações ou outros vínculos. Preserve o histórico e resolva as referências antes da remoção.</p><ul>'+check.dependencies.map(x=>`<li>${esc(x.table)}: ${esc(x.reason)}</li>`).join('')+'</ul>':'<p>Cadastro sem vínculos encontrados. A exclusão será auditada e exige confirmação.</p>'+input('reason','Motivo da exclusão (mínimo 10 caracteres)')+input('confirmation','Digite EXCLUIR para confirmar')}`,check.blocked?null:async data=>{if(data.confirmation!=='EXCLUIR')throw Error('Digite EXCLUIR.');await api.rpc('registry_delete_commit',{entity:type,id:rid,token:check.token,...data});state.selected.clear();state.lookups=await api.rpc('lookups');notify('Cadastro excluído com auditoria.');});
+}
+async function action(id){if(id==='debtor-event-add'&&state.activeDebtor)return openDebtorEvent(state.activeDebtor);if(id==='debtor-contact-card'){const debtor=state.activeDebtor;if(!debtor)throw Error('Selecione um devedor.');return openDebtorContactCard(debtor);}if(id.startsWith('open-title:')){await openRecord(id.slice('open-title:'.length));return;}if(id==='toggle-filters'){const form=$('#filters'),expanded=form.classList.toggle('filters-expanded'),b=form.querySelector('[data-action=toggle-filters]');b.setAttribute('aria-expanded',String(expanded));b.textContent=expanded?'Ocultar filtros avançados':'Filtros avançados';return;}if(id==='refresh-debtors'){state.lookups=await api.rpc('lookups');if(!state.activeDebtor&&state.section==='Cobrança')renderProcesses();return;}if(id==='back-to-debtors'){++loadSequence;debtorContextLoader.clear();state.activeDebtor=null;state.filters={};state.detail=null;state.tab=0;state.page=1;state.selected.clear();renderProcesses();return;}if(id==='select-results'){const debtor=state.activeDebtor;if(!debtor)return;const rows=await loadDebtorTitles(debtor,state.filters,state.sort,state.direction);if(state.activeDebtor!==debtor)return;if(rows.length>1000)throw Error('Refine a consulta para selecionar até 1.000 títulos.');state.selected=new Set(rows.map(row=>row.id));renderProcesses();notify(rows.length+' títulos selecionados. Use Negociar / simular.');return;}if(id==='collection-whatsapp'){await navigate('Processo','WhatsApp da cobrança');return;}
+ if(['negotiate','simulate'].includes(id)||id.startsWith('negotiate:')||id.startsWith('simulate:')){const mode=id.startsWith('simulate')?'simulation':'agreement';let target=id.includes(':')?id.slice(id.indexOf(':')+1):null;if(!target){if(state.selected.size===1)target=[...state.selected][0];else if(state.selected.size>1)return openJointNegotiation({api,modal,notify,guard,profile:state.profile,mode,openPayment:openTitlePayment,refresh:async ident=>{state.detail=await api.rpc('detail',{id:ident});state.selected.clear();state.tab=2;}},[...state.selected]);else if(state.tab!==0&&state.detail)target=state.detail.process.id;else throw Error('Selecione um título na lista ou clique em Simular na linha desejada.');}return openNegotiation({api,modal,notify,guard,profile:state.profile,mode,openPayment:openTitlePayment,refresh:async ident=>{state.detail=await api.rpc('detail',{id:ident});state.tab=2;}},target);}
+
+ if(id==='menu'){setNavigation();return;}
+ if(id==='email-config'){await configureEmail(emailTools());return;}
+ if(id==='email-send'){if(!state.detail)throw Error('Selecione um processo.');await openEmail(state.detail.process.id,emailTools());return;}
+ if(id==='email-history'){if(!state.detail)throw Error('Selecione um processo.');await emailHistory(state.detail.process.id,emailTools());return;}
+ if(id==='logout'){++loadSequence;clearTimeout(shell.timer);clearTimeout(renderEntities.timer);state=initialState();document.querySelector('dialog')?.remove();await api.logout();loginView();return;}
+ if(id==='settings'){modal('Configurações',input('name','Nome da assessoria','text',state.profile.tenant_name)+input('recovery_goal','Meta de recuperação mensal','number',state.profile.recovery_goal||0),async data=>{await api.rpc('settings',data);state.profile=await api.rpc('profile');shell();});return;}
+ if(id==='notifications'){const r=await api.rpc('notifications');modal('Pendências operacionais',plainTable(r),null);return;}
+ if(id.startsWith('user-access:')){if(entity()!=='users')throw Error('Abra o cadastro de usuários.');if(state.selected.size!==1)throw Error('Selecione um único usuário na lista.');const record=state.rows.find(x=>x.id===[...state.selected][0]);if(!record)throw Error('Selecione o usuário nesta página.');const operation=id.split(':')[1];modal(operation==='archive'?'Excluir acesso':operation==='restore'?'Restaurar acesso excluído':'Inativar usuário',`<p>${esc(record.name)} · ${esc(record.email)}</p><p>${operation==='archive'?'O acesso será removido da lista e bloqueado. O histórico e os dados realizados por esse usuário serão preservados.':operation==='restore'?'O usuário voltará à lista como inativo. Edite o cadastro para liberar o acesso.':'O usuário deixará de acessar a ferramenta, inclusive com uma sessão já aberta.'}</p>`,async()=>{await api.rpc('team',{operation,id:record.id,invitation:record.invitation});state.selected.clear();notify('Acesso atualizado. Histórico preservado.');});return;}
+ if(id==='change-password'){modal('Alterar minha senha',input('current_password','Senha atual','password')+input('new_password','Nova senha (mínimo 12 caracteres)','password')+input('confirm_password','Confirmar nova senha','password'),async data=>{if(data.new_password.length<12||data.new_password!==data.confirm_password)throw Error('Use pelo menos 12 caracteres e confirme a mesma senha.');await api.login(api.user().email,data.current_password);await api.changePassword(data.new_password);notify('Senha alterada.');});return;}
+ if(id==='new'){entity()?entityForm():newProcess();return;}
+ if(id==='refresh'){await load();return;}
+ if(id==='search'){if($('#filters'))state.filters=Object.fromEntries(new FormData($('#filters')));state.selected.clear();state.tab=0;state.page=1;await load();return;}
+ if(id==='close'){state.module='Relatórios';state.section='Painel gerencial';shell();await load();return;}
+ if(id==='unselect'){state.selected.clear();renderProcesses();return;}
+ if(id==='prev'||id==='next'){if(id==='prev'&&state.page>1)state.page--;else if(id==='next'&&state.page*25<state.count)state.page++;else return;await load();return;}
+ if(id==='export'){const report=!entity()&&(state.module!=='Processo'||state.section==='Consulta de Recebimentos');const debtor=!report&&!entity()?state.activeDebtor:null;const filters=debtor?debtorTitleFilters(debtor,state.filters):state.filters;const result=report?(await api.rpc('report',{report:state.section,filters})).rows:await api.rpc('export',{entity:entity()||'processes',filters});const r=debtor?result.filter(row=>belongsToDebtor(row,debtor)):result;download(new Blob([csv(r)],{type:'text/csv;charset=utf-8'}),'cobranca.csv');return;}
+ if(id==='print'){window.print();return;}
+ if(id==='import'&&entity()==='debtors'){await openBordero({api,guard,onImported:async()=>{state.lookups=await api.rpc('lookups');await load();}});return;}
+ if(id==='import'||id==='import-lista'){if(!['creditors','debtors'].includes(entity()))throw Error('Importação disponível para clientes e devedores.');modal('Importação CSV',`<label>Arquivo CSV (UTF-8, colunas name,document,email,phone; devedores também precisam creditor_id)<input type="file" name="file" accept=".csv" required></label><p>Os registros serão validados e importados em uma única transação.</p>`,async data=>{if(data.file.size>1048576)throw Error('Limite de 1 MB.');const rows=parseCsv(await data.file.text());await api.rpc('import',{entity:entity(),rows});state.lookups=await api.rpc('lookups');});return;}
+ if(id==='import-photo-debtor'){if(entity()!=='debtors'||!['admin','master','supervisor'].includes(state.profile.role))throw Error('Acesso não autorizado.');await openDocumentImport({api,guard,mode:'devedor',onImported:async()=>{state.lookups=await api.rpc('lookups');await load();}});return;}
+  if(id==='import-photo-cheque'){if(!['admin','master','supervisor'].includes(state.profile.role))throw Error('Acesso não autorizado.');await openDocumentImport({api,guard,mode:'cheque',onImported:async()=>{state.lookups=await api.rpc('lookups');await load();}});return;}
+  if(id==='duplicate-debtors'){const r=await api.rpc('duplicate_debtors',{});const canDelete=['admin','master'].includes(state.profile.role);const dlg=modal('Possíveis devedores duplicados',r.rows?.length?r.rows.map(g=>`<article class="task"><strong>${esc(g.normalized_name)}</strong><p>${g.duplicates} cadastros para o mesmo credor</p>${g.records.map(x=>`<p>${esc(x.name)} · ${esc(x.document||'Sem documento')} · ${esc(x.titles)} título(s) · ${esc(x.id)} ${canDelete&&Number(x.titles)===0?'<button type="button" data-duplicate-delete="'+esc(x.id)+'">Conferir exclusão</button>':''}</p>`).join('')}</article>`).join(''):'<p>Nenhum nome duplicado na mesma carteira.</p>',null);for(const b of dlg.querySelectorAll('[data-duplicate-delete]'))b.onclick=()=>guard(()=>confirmRegistryDeletion('debtors',b.dataset.duplicateDelete));return;}
+  if(id==='creditor-chat'){
+  if(state.profile.role==='creditor'){openCreditorChat();return;}
+  if(!['admin','master'].includes(state.profile.role)||entity()!=='creditors'||state.selected.size!==1)throw Error('Selecione um credor para abrir o chat.');
+  openCreditorChat([...state.selected][0]);return;
+ }
+ if(id==='creditor-access'){openCreditorAccess();return;}
+  if(id==='preview-creditor'){await previewCreditorDashboard();return;}
+  if(id==='delete-registry'){if(!['admin','master'].includes(state.profile.role))throw Error('Apenas administrador.');const type=entity();if(!['creditors','debtors'].includes(type)||state.selected.size!==1)throw Error('Selecione exatamente um cadastro na tabela.');const rid=[...state.selected][0];await confirmRegistryDeletion(type,rid);return;}
+  if(id==='bulk-delete'){
+ if(!['admin','master'].includes(state.profile.role))throw Error('Ação exclusiva do administrador.');
+ const ids=[...state.selected];if(!ids.length)throw Error('Selecione os títulos que deseja excluir.');
+ const preview=await api.rpc('debt_delete_preview',{ids});
+ modal('Excluir títulos em massa',`<div class="bulk-delete-preview"><p><strong>${preview.count} títulos · ${brl(preview.total)}</strong></p><p>A exclusão remove os títulos da cobrança e preserva uma cópia na auditoria. Cadastros de empresas e devedores serão preservados.</p><div class=table-wrap><table><thead><tr><th>Título</th><th>Devedor</th><th>Valor original</th><th>Verificação</th></tr></thead><tbody>${preview.rows.map(r=>`<tr><td>${esc(r.reference)}</td><td>${esc(r.debtor)}</td><td>${brl(r.amount)}</td><td>${r.blocked?'Bloqueado: possui vínculos':'Pode excluir'}</td></tr>`).join('')}</tbody></table></div>${preview.blocked?'<p class=error>Retire da seleção os títulos com histórico, documentos ou movimentações. Nenhum título deste lote será excluído.</p>':input('reason','Motivo da exclusão (mínimo 10 caracteres)')+input('confirmation','Digite EXCLUIR para confirmar')}</div>`,preview.blocked?null:async data=>{const result=await api.rpc('debt_delete_commit',{...data,ids,token:preview.token});state.selected.clear();notify(result.deleted+' títulos excluídos com auditoria.');});return;
+ }
+ if(id==='distribute'){if(!state.selected.size)throw Error('Selecione os processos que deseja distribuir.');modal('Distribuir por empresa devedora','<p>Todos os títulos abertos das empresas devedoras selecionadas serão atribuídos ao mesmo cobrador, inclusive em outras páginas e credores. Títulos encerrados serão preservados.</p>'+select('assigned_to','Cobrador',state.lookups.users)+input('reason','Motivo'),data=>api.rpc('distribute',{...data,ids:[...state.selected]}));return;}
+ const d=state.detail;if(!d)throw Error('Selecione um processo.');const process=d.process;
+ if(id==='title-grace'){
+  if(!['admin','master'].includes(state.profile.role))throw Error('Somente o administrador pode configurar a carência por título.');
+  const previous=process.metadata?.title_grace||{};
+  const terms=d.financial?.terms||{};
+  const initial=previous.selection||'inherit';
+  const titleInfo='<p>Vencimento original: <strong>'+esc((process.due_date||'').split('-').reverse().join('/'))+'</strong> (não será alterado).</p>'+
+   '<p>Carência em uso: <strong>'+esc(terms.grace_days??0)+' dias</strong>. A configuração afeta apenas a regra de carência deste título; taxas e base de honorários continuam vinculadas ao contrato.</p>'+
+   '<p>Não é permitido alterar títulos com pagamentos, acordos ou saldo financeiro encerrado. Alterações são auditadas e os registros anteriores permanecem preservados.</p>';
+  const dialog=modal('Carência individual do título',titleInfo+
+   select('selection','Modalidade da carência',[
+    {id:'inherit',name:'Herdar carência do credor / contrato'},
+    {id:'custom',name:'Carência personalizada para este título'},
+    {id:'none',name:'Sem carência (zero dias)'}
+   ],initial)+input('days','Dias de carência personalizada','number',previous.days??terms.grace_days??0,false)+input('reason','Justificativa da alteração','text','',true),
+   async data=>{
+    if(!['inherit','custom','none'].includes(data.selection))throw Error('Modalidade inválida.');
+    if(data.selection==='custom'&&(!Number.isInteger(Number(data.days))||Number(data.days)<0||Number(data.days)>3650))throw Error('Informe de 0 a 3650 dias.');
+    if(String(data.reason||'').trim().length<10)throw Error('Justifique a alteração (mínimo 10 caracteres).');
+    const result=await api.rpc('title_grace',{id:process.id,selection:data.selection,days:data.days,reason:data.reason});
+    if(result.due_date!==process.due_date)throw Error('O vencimento original foi alterado inesperadamente. Solicite conferência.');
+    state.detail=await api.rpc('detail',{id:process.id});
+    notify('Carência atualizada. Vencimento original preservado; confira a nova memória de cálculo.');
+   });
+  const selection=dialog.querySelector('[name=selection]'),days=dialog.querySelector('[name=days]');
+  function changeMode(){days.closest('label').hidden=selection.value!=='custom';days.required=selection.value==='custom';days.max='3650';days.min='0';days.step='1';}
+  selection.addEventListener('change',changeMode);changeMode();
+  return;
+ }
+ if(id==='contract'){const terms=d.financial?.terms||{};modal('Regra contratual do processo','<p>Juros simples sobre o principal restante; multa única no primeiro atraso. Recebimentos abatem juros, multa e principal. Confirme que estas regras correspondem ao contrato. Processos com movimentos financeiros não podem ser alterados.</p>'+input('contract_ref','Referência do contrato','text',process.contract_ref||'')+select('financial_mode','Periodicidade contratual',financialModes,terms.mode||'none')+input('interest_percent','Juros por período (%)','number',process.interest_percent||'0')+input('fine_percent','Multa única (%)','number',process.fine_percent||'0')+input('grace_days','Carência em dias','number',terms.grace_days||'0'),async data=>{await api.rpc('contract',{id:process.id,...data});state.detail=await api.rpc('detail',{id:process.id});});return;}
+ if(id==='client-processes'){state.filters={creditor_id:process.creditor_id,scope:'Todos'};state.activeDebtor=null;state.debtorQuery='';state.selected.clear();state.detail=null;state.tab=0;state.page=1;await load();return;}
+ if(id==='status'){modal('Alterar situação',select('status','Situação',statuses,process.app_status)+input('reason','Motivo'),async data=>{await api.rpc('status',{id:process.id,...data});state.detail=await api.rpc('detail',{id:process.id});});return;}
+ if(id==='history'){modal('Registrar contato',select('channel','Canal / tipo',[{id:'human',name:'Observação'},{id:'voice',name:'Ligação'},{id:'email',name:'Registro de e-mail'},{id:'promise',name:'Promessa de pagamento'}],state.tab===5?'voice':'human')+select('outcome','Resultado do contato',[{id:'Tentativa sem resposta',name:'Tentativa sem resposta'},{id:'Contato efetivado',name:'Contato efetivado'},{id:'Retorno combinado',name:'Retorno combinado'},{id:'Promessa de pagamento',name:'Promessa de pagamento'},{id:'Contato inválido',name:'Contato inválido'},{id:'Observação',name:'Observação'}])+input('subject','Assunto')+input('content','Descrição do ocorrido')+input('promised_date','Data prometida','date','',false),async data=>{const {outcome,subject,...record}=data;await api.rpc('history',{id:process.id,...record,subject:outcome+' · '+subject});state.detail=await api.rpc('detail',{id:process.id});});return;}
+ if(id.startsWith('agreement-statement:'))return openAgreementStatement({api,modal,guard,profile:state.profile},id.slice('agreement-statement:'.length));
+ if(id==='agreement')return openNegotiation({api,modal,notify,guard,profile:state.profile,openPayment:openTitlePayment,refresh:async ident=>{state.detail=await api.rpc('detail',{id:ident});state.tab=2;}},process.id);
+ if(id==='receipts'){const r=await api.rpc('report',{report:'Recebimentos',filters:{}});const rows=r.rows.filter(x=>x.debt_id===process.id);const dlg=modal('Recebimentos do processo',rows.map(x=>`<article class="receipt"><strong>${esc(x.reference)}</strong><span>${brl(x.amount)} · ${esc(x.paid_date)} · ${x.reversed?'Estornado':'Confirmado'}</span>${!x.reversed&&['admin','master','finance'].includes(state.profile.role)?`<button type="button" data-reverse="${esc(x.id)}">Estornar</button>`:''}</article>`).join('')||'<p>Nenhum recebimento registrado.</p>',null);dlg.querySelectorAll('[data-reverse]').forEach(b=>b.onclick=()=>{modal('Estornar recebimento',input('reason','Motivo do estorno'),async data=>{await api.rpc('reverse',{id:process.id,receipt_id:b.dataset.reverse,...data});state.detail=await api.rpc('detail',{id:process.id});});});return;}
+ if(id==='payment')return openPayment(d);
+ if(id==='document'){modal('Anexar documento','<label>Arquivo (PDF ou imagem, até 5 MB)<input name="file" type="file" accept=".pdf,.png,.jpg,.jpeg" required></label>',async data=>{const f=data.file;if(f.size>5*1024*1024)throw Error('Limite de 5 MB.');const buffer=new Uint8Array(await f.arrayBuffer());let binary='';for(const byte of buffer)binary+=String.fromCharCode(byte);await api.rpc('document',{id:process.id,name:f.name,mime:f.type,content:btoa(binary)});state.detail=await api.rpc('detail',{id:process.id});});return;}
+ if(id.startsWith('download:')){const file=await api.rpc('download',{id:id.split(':')[1]});const bytes=Uint8Array.from(atob(file.content),c=>c.charCodeAt(0));download(new Blob([bytes],{type:file.mime}),file.name);return;}
+}
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+async function start(){++loadSequence;state=initialState();try{state.profile=await api.rpc('profile');}catch(e){if(!e.message.includes('sem vínculo ativo'))throw e;try{await api.claimAdmin();}catch{const member=await api.membership('claim');if(!member.ready){loginView();modal('Cadastrar minha empresa','<p>Este e-mail ainda não pertence a uma empresa. Para entrar em uma empresa existente, solicite autorização ao administrador. Ao cadastrar uma nova empresa, seus dados ficam isolados das demais.</p>'+input('name','Nome da nova empresa'),async data=>{await api.membership('create_company',data);await start();});return;}}state.profile=await api.rpc('profile');}state.lookups=await api.rpc('lookups');if(state.profile.role!=='creditor'&&visibleSections('Relatórios').includes('Dashboard Geral')){state.module='Relatórios';state.section='Dashboard Geral';}if(['creditor','commercial','commercial_manager'].includes(state.profile.role)){state.module=Object.keys(modules).find(m=>visibleSections(m).length)||'Processo';state.section=visibleSections(state.module)[0]||'Acesso pendente';if(state.profile.role==='creditor'&&clientAllowed('processes')){state.module='Relatórios';state.section='Acompanhamento do credor';}}const requested=parseRoute(window.location.hash);if(requested&&modules[requested.module]&&visibleSections(requested.module).includes(requested.section)){state.module=requested.module;state.section=requested.section;}shell();if(state.section==='Acesso pendente'){$('#content').innerHTML='<div class=panel>Seu administrador ainda não liberou consultas para este acesso.</div>';return;}await load();}
+document.addEventListener('keydown',e=>{if(e.key.match(/^F[5-9]$/)&&api.authenticated()){e.preventDefault();if(['commercial','commercial_manager'].includes(state.profile?.role)){if(e.key==='F5')guard(load);return;}const tab=Number(e.key.slice(1))-5;if(!tabAllowed(tab))return;state.module='Processo';state.section='Cobrança';state.tab=tab;shell();renderProcesses();}});
+window.addEventListener('hashchange',()=>{if(!api.authenticated()||!state.profile)return;const route=parseRoute(window.location.hash);if(!route||!modules[route.module]||!visibleSections(route.module).includes(route.section)){notify('Página indisponível para este perfil.');history.replaceState(null,'',routeHash(state.module,state.section));return;}if(route.module!==state.module||route.section!==state.section)guard(()=>navigate(route.module,route.section));});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('menu-open')){document.body.classList.remove('menu-open');const b=document.querySelector('[data-action=menu]');b?.setAttribute('aria-expanded','false');b?.focus();}});
+
+installPasswordControls();
+installWindowControls();
+await api.init();if(api.authenticated()){try{await start();}catch(e){loginView();notify(e.message);}}else loginView();
+
+
+installDatePickers();

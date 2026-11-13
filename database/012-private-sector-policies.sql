@@ -1,0 +1,2 @@
+-- Explicit deny policies document the private-table boundary; validated RPCs are the only access path.
+do $$declare tab text;begin foreach tab in array array['crm_opportunities','crm_activities','crm_tasks','commission_rules','commission_entries','distribution_rules','creditor_connections','bordero_events'] loop execute format('create policy deny_direct_client_access on cobranca_private.%I for all to anon,authenticated using (false) with check (false)',tab);end loop;end$$;

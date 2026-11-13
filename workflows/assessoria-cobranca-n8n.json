@@ -1,0 +1,846 @@
+{
+  "name": "Assessoria de Cobrança IA - WhatsApp, Email, Ligação e Compliance",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cobranca-whatsapp-in",
+        "responseMode": "onReceived",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "22f5d833-dbe4-4dac-b3f5-9ebef9455177",
+      "name": "Webhook WhatsApp - Entrada",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "88641193-b66b-41ea-8d19-641171c125a8",
+      "name": "Schedule - Régua de Cobrança",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function onlyDigits(v) { return String(v || '').replace(/\\D/g, ''); }\nfunction normalizePhone(raw) {\n  let p = onlyDigits(raw);\n  if (p.startsWith('55') && p.length >= 12) return p;\n  if (p.length === 10 || p.length === 11) return '55' + p;\n  return p;\n}\n\nconst raw = items[0].json || {};\nconst body = raw.body || raw;\nconst data = body.data || body;\nconst key = data.key || {};\nconst msg = data.message || body.message || {};\nconst remote = key.remoteJid || body.remoteJid || body.from || body.phone || body.sender || '';\nconst pushName = data.pushName || body.pushName || body.name || '';\nconst text = msg.conversation || msg?.extendedTextMessage?.text || msg?.imageMessage?.caption || msg?.documentMessage?.caption || body.text || body.messageText || '';\nconst phone = normalizePhone(remote);\nconst hasAttachment = Boolean(msg.imageMessage || msg.documentMessage || msg.audioMessage || msg.videoMessage || body.attachment);\n\nreturn [{\n  json: {\n    source: 'inbound_whatsapp',\n    tenant_id: process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000000',\n    channel: 'whatsapp',\n    direction: 'inbound',\n    phone,\n    whatsapp_jid: remote,\n    name: pushName,\n    text: String(text || '').trim(),\n    has_attachment: hasAttachment,\n    received_at: new Date().toISOString(),\n    provider_payload: body\n  }\n}];"
+      },
+      "id": "e3d3c734-4236-41d0-ae9e-4d7970484c59",
+      "name": "Normalizar Entrada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/cobranca_debtors?phone=eq.{{$json.phone}}&select=*,debts:cobranca_debts(*)&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "9f0c1f44-d974-4715-8d85-f00294cba330",
+      "name": "Supabase - Buscar Devedor por Telefone",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        540,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/cobranca_debts?status=in.(open,promised,agreement)&next_action_at=lte.{{$now.toISO()}}&select=*,debtor:cobranca_debtors(*),creditor:cobranca_creditors(*)&limit=50",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "8b9f0124-8f1e-4854-aec3-1a452c4e8a3d",
+      "name": "Supabase - Buscar Dívidas Para Ação",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        260,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = items[0]?.json;\nconst rows = Array.isArray(response) ? response : (Array.isArray(response?.data) ? response.data : []);\nreturn rows.map((row) => {\n  const debtor = row.debtor || row.cobranca_debtors || row.debtor_id || {};\n  return {\n    json: {\n      source: 'scheduled_collection',\n      tenant_id: row.tenant_id || process.env.DEFAULT_TENANT_ID,\n      channel: debtor.preferred_channel || 'whatsapp',\n      direction: 'outbound',\n      phone: debtor.phone,\n      email: debtor.email,\n      name: debtor.name,\n      debtor,\n      debt: row,\n      text: '',\n      received_at: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "id": "8e16129b-d640-47d0-9e96-9233f9af8948",
+      "name": "Montar Lote de Cobrança",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function brl(value) {\n  const n = Number(value || 0);\n  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });\n}\nfunction daysBetween(a, b) {\n  const A = new Date(a); const B = new Date(b);\n  return Math.floor((B - A) / 86400000);\n}\nfunction greeting() {\n  const hour = Number(new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', hour12: false, timeZone: process.env.DEFAULT_TIMEZONE || 'America/Sao_Paulo' }).format(new Date()));\n  if (hour < 12) return 'Bom dia';\n  if (hour < 18) return 'Boa tarde';\n  return 'Boa noite';\n}\nfunction currentHour() {\n  return Number(new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', hour12: false, timeZone: process.env.DEFAULT_TIMEZONE || 'America/Sao_Paulo' }).format(new Date()));\n}\nfunction detectIntent(text, hasAttachment) {\n  const t = String(text || '').toLowerCase();\n  if (hasAttachment) return 'proof_or_attachment';\n  if (/\\b(paguei|pagamento feito|comprovante|ja paguei|já paguei|quitado)\\b/.test(t)) return 'paid_claim';\n  if (/\\b(não reconheço|nao reconheco|não é minha|nao e minha|indevida|errado|desconheço|desconheco)\\b/.test(t)) return 'dispute';\n  if (/\\b(negociar|acordo|parcelar|parcela|desconto|proposta)\\b/.test(t)) return 'negotiate';\n  if (/\\b(boleto|pix|segunda via|link|codigo|código)\\b/.test(t)) return 'payment_link';\n  if (/\\b(atendente|humano|pessoa|ligar|me liga)\\b/.test(t)) return 'human';\n  if (/\\b(advogado|procon|processo|reclamação|reclamacao)\\b/.test(t)) return 'legal_sensitive';\n  if (/\\b(parar|não mande|nao mande|remover|bloquear|sair)\\b/.test(t)) return 'opt_out';\n  return 'general';\n}\nfunction stageFromDays(days) {\n  if (days < 0) return 'pre_due';\n  if (days <= 2) return 'd0_d2';\n  if (days <= 6) return 'd3_d6';\n  if (days <= 14) return 'd7_d14';\n  if (days <= 29) return 'd15_d29';\n  return 'd30_plus';\n}\n\nconst input = $json;\nlet debtor = input.debtor || {};\nlet debt = input.debt || {};\n\n// Se veio do lookup REST, alguns retornos chegam como array.\nif (!input.debt && Array.isArray($json)) {\n  const row = $json[0] || {};\n  debtor = row;\n  debt = row.debts?.[0] || row.cobranca_debts?.[0] || {};\n}\n\nconst now = new Date();\nconst startHour = Number(process.env.COLLECTION_START_HOUR || 8);\nconst endHour = Number(process.env.COLLECTION_END_HOUR || 20);\nconst hour = currentHour();\nconst withinHours = hour >= startHour && hour < endHour;\nconst daysOverdue = debt.due_date ? daysBetween(debt.due_date, now) : 0;\nconst stage = debt.stage || stageFromDays(daysOverdue);\nconst intent = detectIntent(input.text, input.has_attachment);\nconst name = input.name || debtor.name || 'tudo bem';\nconst amount = brl(debt.current_amount || debt.original_amount || 0);\nconst paymentLink = debt.payment_link || debt.boleto_url || '';\nconst pix = debt.pix_code || '';\n\nconst blockingReasons = [];\nif (!withinHours) blockingReasons.push('outside_allowed_hours');\nif (debtor.opt_out || intent === 'opt_out') blockingReasons.push('opt_out');\nif (debtor.dispute_status === 'open' || debt.status === 'disputed' || intent === 'dispute') blockingReasons.push('dispute_open');\nif (['paid','cancelled','canceled','uncollectible'].includes(String(debt.status || '').toLowerCase())) blockingReasons.push('debt_not_collectable');\nif (['paid_claim','proof_or_attachment','legal_sensitive','human'].includes(intent)) blockingReasons.push('human_review_required');\n\nconst canContact = blockingReasons.length === 0;\nlet shouldWhatsApp = canContact && Boolean(input.phone || debtor.phone);\nlet shouldEmail = canContact && Boolean(input.email || debtor.email) && ['d3_d6','d7_d14','d15_d29','d30_plus'].includes(stage);\nlet shouldCall = canContact && Boolean(input.phone || debtor.phone) && ['d7_d14','d15_d29'].includes(stage);\nlet shouldHuman = !canContact || ['d30_plus'].includes(stage) || debt.human_required || debtor.human_required;\n\nlet baseMessage = '';\nif (intent === 'payment_link') {\n  baseMessage = `${name}, posso te ajudar sim. ${paymentLink ? 'Segue o link atualizado para regularização: ' + paymentLink : 'Vou localizar a segunda via e te enviar com segurança.'}${pix ? '\\nPix copia e cola: ' + pix : ''}`;\n} else if (intent === 'negotiate') {\n  baseMessage = `${name}, claro. Posso verificar uma alternativa para regularização. Você prefere pagar à vista com desconto ou parcelar?`;\n} else if (intent === 'dispute') {\n  baseMessage = `${name}, entendi. Vou pausar a cobrança automática e encaminhar para conferência humana. Para agilizar, pode me informar qual dado está incorreto?`;\n} else if (intent === 'paid_claim' || intent === 'proof_or_attachment') {\n  baseMessage = `${name}, obrigado pelo retorno. Vou pausar a cobrança automática e encaminhar o comprovante/informação para validação.`;\n} else if (stage === 'pre_due') {\n  baseMessage = `${greeting()}, ${name}. Passando para lembrar de um vencimento programado. Posso te enviar o link atualizado para pagamento?`;\n} else if (stage === 'd0_d2') {\n  baseMessage = `${greeting()}, ${name}. Identificamos uma pendência recente no valor de ${amount}. Quer que eu te envie o link/Pix atualizado para regularizar?`;\n} else if (stage === 'd3_d6') {\n  baseMessage = `${name}, estou passando de forma rápida para te ajudar com a pendência em aberto. Posso verificar uma opção de pagamento ou negociação para você?`;\n} else if (stage === 'd7_d14') {\n  baseMessage = `${name}, sua pendência continua em aberto. Posso te ajudar agora com pagamento à vista ou uma proposta de acordo?`;\n} else if (stage === 'd15_d29') {\n  baseMessage = `${name}, precisamos atualizar a situação do seu contrato. Posso registrar uma previsão de pagamento ou proposta para análise?`;\n} else {\n  baseMessage = `${name}, seu caso precisa de uma revisão mais cuidadosa. Vou encaminhar para um especialista da assessoria verificar a melhor alternativa de regularização.`;\n}\n\nreturn [{ json: {\n  ...input,\n  tenant_id: input.tenant_id || debtor.tenant_id || debt.tenant_id || process.env.DEFAULT_TENANT_ID,\n  debtor_id: debtor.id || debt.debtor_id || null,\n  debt_id: debt.id || null,\n  creditor_id: debt.creditor_id || debtor.creditor_id || null,\n  debtor,\n  debt,\n  stage,\n  days_overdue: daysOverdue,\n  intent,\n  name,\n  amount,\n  payment_link: paymentLink,\n  pix_code: pix,\n  compliance: {\n    canContact,\n    withinHours,\n    blockingReasons,\n    startHour,\n    endHour,\n    rule: 'CDC_LGPD_SAFE_COLLECTION'\n  },\n  shouldWhatsApp,\n  shouldEmail,\n  shouldCall,\n  shouldHuman,\n  typingSeconds: Math.min(10, Math.max(4, Math.ceil(baseMessage.length / 45))),\n  fallback_message: baseMessage,\n  emailSubject: `Regularização de pendência${debt.contract_ref ? ' - contrato ' + debt.contract_ref : ''}`,\n  emailBody: `Olá, ${name}.\\n\\nIdentificamos uma pendência vinculada ao seu cadastro${debt.contract_ref ? ' / contrato ' + debt.contract_ref : ''}.\\nValor atualizado: ${amount}.\\n\\n${paymentLink ? 'Link para regularização: ' + paymentLink : 'Caso queira, responda este e-mail para receber a segunda via atualizada.'}\\n\\nSe você já pagou ou não reconhece esta cobrança, responda esta mensagem para conferirmos com prioridade.\\n\\nAtenciosamente,\\nEquipe de Atendimento`,\n  ai_prompt: `Você é um agente de IA de uma assessoria de cobrança no Brasil. Gere uma mensagem curta, humana, cordial e segura para WhatsApp. Regras: não ameaçar, não constranger, não expor, não citar negativação/processo/protesto, não falar com terceiros, não usar tom agressivo, no máximo 3 frases curtas, fazer no máximo 1 pergunta, respeitar LGPD/CDC. Contexto: nome=${name}; etapa=${stage}; intenção=${intent}; valor=${amount}; link=${paymentLink || 'indisponível'}; mensagem_base=${baseMessage}`\n}}];"
+      },
+      "id": "186dad3b-80eb-42f3-bc11-861448df7e98",
+      "name": "Motor de Decisão e Compliance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        170
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.compliance.canContact}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "3dd9ff0d-4afe-4a49-b282-1a179b2631c2",
+      "name": "IF - Pode Enviar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        170
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.EVOLUTION_BASE_URL}}/chat/sendPresence/{{$env.EVOLUTION_INSTANCE}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.EVOLUTION_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"number\":\"{{$json.phone}}\",\"presence\":\"composing\",\"delay\":{{$json.typingSeconds * 1000}}}",
+        "options": {}
+      },
+      "id": "7094fa28-45cb-4d36-a4dd-17f3c160ab2c",
+      "name": "WhatsApp - Digitando",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        60
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": "={{$json.typingSeconds || 6}}",
+        "unit": "seconds"
+      },
+      "id": "526bc1b1-416e-4412-b020-086b2d3d3c43",
+      "name": "Pausa Humanizada",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1640,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => ({ json: { ...item.json, openai_body: { model: process.env.OPENAI_MODEL || 'gpt-4.1-mini', messages: [{ role: 'system', content: 'Você escreve mensagens de cobrança seguras, humanas, curtas, sem ameaça e sem constrangimento.' }, { role: 'user', content: item.json.ai_prompt }], temperature: 0.35, max_tokens: 220 } } }));"
+      },
+      "id": "b07bf111-7ad3-4ad2-902f-85c288bb557b",
+      "name": "Preparar Prompt IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1880,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.OPENAI_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify($json.openai_body)}}",
+        "options": {}
+      },
+      "id": "af3aa057-774d-48b3-b5c9-4e397b887913",
+      "name": "OpenAI - Gerar Resposta Humanizada",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        2140,
+        60
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const previous = $('Preparar Prompt IA').item.json;\nlet aiText = '';\ntry {\n  aiText = $json?.choices?.[0]?.message?.content || $json?.output_text || '';\n} catch (e) {}\nlet finalText = String(aiText || previous.fallback_message || '').trim();\n\nconst forbidden = /(ameaç|ameaça|processo judicial imediato|pris[aã]o|vergonha|caloteiro|sujo|expor|família|familia|vizinhos|empregador|negativar hoje|protesto hoje)/i;\nconst tooLong = finalText.length > 650;\nif (!finalText || forbidden.test(finalText) || tooLong) {\n  finalText = previous.fallback_message;\n}\n\n// Quebra mensagem em blocos curtos sem perder clareza.\nfinalText = finalText\n  .replace(/\\s+/g, ' ')\n  .replace(/\\. /g, '.\\n')\n  .trim();\n\nreturn [{ json: { ...previous, final_message: finalText } }];"
+      },
+      "id": "bac05a2c-855d-46d1-83dd-0bd63da16734",
+      "name": "Validar Resposta Segura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.shouldWhatsApp}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "76149826-24b8-4845-8c21-36a052d251c0",
+      "name": "IF - Enviar WhatsApp",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2660,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.EVOLUTION_BASE_URL}}/message/sendText/{{$env.EVOLUTION_INSTANCE}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.EVOLUTION_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"number\":\"{{$json.phone}}\",\"text\":\"{{$json.final_message}}\"}",
+        "options": {}
+      },
+      "id": "87b2a51c-589d-4de8-8021-f953633627ea",
+      "name": "WhatsApp - Enviar Mensagem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        2920,
+        -80
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.shouldEmail}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "14beacce-10fe-464a-9f61-2f10419968dd",
+      "name": "IF - Enviar Email",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2660,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.MAILER_API_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.MAILER_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"from\":{\"name\":\"{{$env.MAIL_FROM_NAME}}\",\"email\":\"{{$env.MAIL_FROM_EMAIL}}\"},\"to\":\"{{$json.email || $json.debtor.email}}\",\"subject\":\"{{$json.emailSubject}}\",\"text\":\"{{$json.emailBody}}\"}",
+        "options": {}
+      },
+      "id": "5b70cde5-f253-40bd-a37d-c06bbd953653",
+      "name": "Email - Enviar Notificação",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        2920,
+        120
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.shouldCall}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "0ce23716-a4a2-4087-b2d2-b549398401cc",
+      "name": "IF - Criar Ligação",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2660,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.VOICE_API_URL}}/calls",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.VOICE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"to\":\"{{$json.phone}}\",\"from\":\"{{$env.CALLER_ID}}\",\"name\":\"{{$json.name}}\",\"debt_id\":\"{{$json.debt_id}}\",\"reason\":\"collection_followup\",\"notes\":\"Ligação humanizada para negociação, sem exposição a terceiros.\"}",
+        "options": {}
+      },
+      "id": "37d10775-7562-4e1a-8e78-55203df2e95f",
+      "name": "Voz - Criar Ligação/Tarefa",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        2920,
+        320
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.shouldHuman}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "d8ce183d-c0d3-4fa7-bf4d-c018ec4a5b2a",
+      "name": "IF - Escalar Humano",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2660,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.HUMAN_HANDOFF_WEBHOOK}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.HUMAN_HANDOFF_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"type\":\"collection_handoff\",\"priority\":\"{{$json.intent === 'legal_sensitive' ? 'urgent' : 'normal'}}\",\"name\":\"{{$json.name}}\",\"phone\":\"{{$json.phone}}\",\"email\":\"{{$json.email || $json.debtor.email}}\",\"debtor_id\":\"{{$json.debtor_id}}\",\"debt_id\":\"{{$json.debt_id}}\",\"intent\":\"{{$json.intent}}\",\"stage\":\"{{$json.stage}}\",\"blockingReasons\":{{$json.compliance.blockingReasons}},\"message\":\"{{$json.text || $json.final_message}}\"}",
+        "options": {}
+      },
+      "id": "2f4211d5-247a-467f-8a2f-65481b84cae4",
+      "name": "Humano - Abrir Tarefa",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        2920,
+        520
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/cobranca_interaction_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"tenant_id\":\"{{$json.tenant_id}}\",\"creditor_id\":{{$json.creditor_id ? `\"${$json.creditor_id}\"` : null}},\"debtor_id\":{{$json.debtor_id ? `\"${$json.debtor_id}\"` : null}},\"debt_id\":{{$json.debt_id ? `\"${$json.debt_id}\"` : null}},\"channel\":\"system\",\"direction\":\"outbound\",\"status\":\"registered\",\"stage\":\"{{$json.stage}}\",\"content\":\"{{$json.final_message || $json.fallback_message || $json.text}}\",\"compliance_flags\":{{$json.compliance}},\"payload\":{{$json}}}",
+        "options": {}
+      },
+      "id": "35ebc814-339a-4116-b006-d1307bfdb261",
+      "name": "Supabase - Registrar Interação",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        3240,
+        170
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/cobranca_interaction_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"tenant_id\":\"{{$json.tenant_id}}\",\"creditor_id\":{{$json.creditor_id ? `\"${$json.creditor_id}\"` : null}},\"debtor_id\":{{$json.debtor_id ? `\"${$json.debtor_id}\"` : null}},\"debt_id\":{{$json.debt_id ? `\"${$json.debt_id}\"` : null}},\"channel\":\"system\",\"direction\":\"internal\",\"status\":\"blocked\",\"stage\":\"{{$json.stage}}\",\"subject\":\"Cobrança bloqueada por regra de compliance\",\"content\":\"{{$json.compliance.blockingReasons.join(', ')}}\",\"compliance_flags\":{{$json.compliance}},\"payload\":{{$json}}}",
+        "options": {}
+      },
+      "id": "c870f4a1-17c7-417a-b1f4-6bc50a5f5898",
+      "name": "Supabase - Registrar Bloqueio/HandOff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        300
+      ],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp - Entrada": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Entrada": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Buscar Devedor por Telefone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Buscar Devedor por Telefone": {
+      "main": [
+        [
+          {
+            "node": "Motor de Decisão e Compliance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule - Régua de Cobrança": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Buscar Dívidas Para Ação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Buscar Dívidas Para Ação": {
+      "main": [
+        [
+          {
+            "node": "Montar Lote de Cobrança",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Lote de Cobrança": {
+      "main": [
+        [
+          {
+            "node": "Motor de Decisão e Compliance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Motor de Decisão e Compliance": {
+      "main": [
+        [
+          {
+            "node": "IF - Pode Enviar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Pode Enviar?": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp - Digitando",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase - Registrar Bloqueio/HandOff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp - Digitando": {
+      "main": [
+        [
+          {
+            "node": "Pausa Humanizada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pausa Humanizada": {
+      "main": [
+        [
+          {
+            "node": "Preparar Prompt IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Prompt IA": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Gerar Resposta Humanizada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Gerar Resposta Humanizada": {
+      "main": [
+        [
+          {
+            "node": "Validar Resposta Segura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Resposta Segura": {
+      "main": [
+        [
+          {
+            "node": "IF - Enviar WhatsApp",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF - Enviar Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF - Criar Ligação",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF - Escalar Humano",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Enviar WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp - Enviar Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Enviar Email": {
+      "main": [
+        [
+          {
+            "node": "Email - Enviar Notificação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Criar Ligação": {
+      "main": [
+        [
+          {
+            "node": "Voz - Criar Ligação/Tarefa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Escalar Humano": {
+      "main": [
+        [
+          {
+            "node": "Humano - Abrir Tarefa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp - Enviar Mensagem": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Registrar Interação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email - Enviar Notificação": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Registrar Interação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voz - Criar Ligação/Tarefa": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Registrar Interação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Humano - Abrir Tarefa": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Registrar Interação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "b9e14ff2-6460-4647-a4bc-8ac1b45b686d",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "importar-no-n8n"
+  },
+  "pinData": {},
+  "tags": [
+    "cobranca",
+    "ia",
+    "whatsapp",
+    "email",
+    "ligacao",
+    "supabase"
+  ]
+}

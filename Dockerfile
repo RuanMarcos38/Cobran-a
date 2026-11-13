@@ -1,0 +1,17 @@
+FROM node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
+COPY package.json package-lock.json ./
+RUN apk add --no-cache tesseract-ocr tesseract-ocr-data-por tesseract-ocr-data-eng poppler-utils
+RUN npm ci --omit=dev --ignore-scripts
+COPY --chown=node:node attendance.mjs mail-imap.mjs mail-trash.mjs server.mjs api-http.mjs prospection-mail.mjs prospection-automation.mjs evolution.mjs email.mjs whatsapp.mjs booking.mjs bank.mjs bordero-csv.mjs document-intake.mjs ocr-engine.mjs openapi.json ./
+COPY --chown=node:node prospection-assets.mjs ./
+COPY --chown=node:node assets ./assets
+COPY --chown=node:node templates/email-cobranca.json ./templates/email-cobranca.json
+COPY --chown=node:node web ./web
+USER node
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD node -e "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+CMD ["node","server.mjs"]
+
+
