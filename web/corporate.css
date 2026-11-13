@@ -240,3 +240,13 @@ html :is(.app-main,.login,dialog) button.primary:hover:not(:disabled){background
 .executive-metric-icon{background:#edf4e1;color:#365b48}
 .negotiation-dialog .form-grid{overflow-anchor:none}
 @media(max-width:680px){.executive-operations{grid-template-columns:1fr}.executive-operations img{max-height:105px}}
+
+.creditor-dashboard .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px;margin:14px 0 22px}
+.creditor-dashboard .metric{min-width:0;margin:0;padding:10px 12px}
+.creditor-dashboard .metric strong{font-size:16px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.creditor-dashboard .collection-hero-actions{margin:10px 0}
+.creditor-chat{grid-column:1/-1;display:grid;gap:12px;min-width:0}
+.creditor-chat [data-chat-messages]{max-height:45vh;overflow:auto}
+.creditor-chat article{padding:10px 0;border-bottom:1px solid var(--line)}
+.creditor-chat article p{white-space:pre-wrap;overflow-wrap:anywhere}
+.creditor-chat textarea{display:block;width:100%;min-height:80px}
