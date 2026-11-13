@@ -146,10 +146,22 @@ html :is(.app-main,.login,dialog) button.primary:hover:not(:disabled){background
 .executive-dashboard{gap:14px}
 .executive-filter summary,.executive-details summary{cursor:pointer;font-weight:650;color:var(--blue)}
 .executive-filter form,.executive-details .corporate-dashboard-grid{margin-top:14px}
-.executive-dashboard .executive-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
-.executive-dashboard .executive-metric{display:flex;align-items:flex-start;gap:12px}
-.executive-metric>div{min-width:0;display:grid;gap:4px}
-.executive-metric strong{font-variant-numeric:tabular-nums}
+.corporate-dashboard.executive-dashboard .executive-metrics{
+ grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));
+ gap:14px;
+}
+.executive-dashboard .executive-metric{
+ display:grid;
+ grid-template-columns:auto minmax(0,1fr);
+ grid-template-rows:32px auto 1fr;
+ align-items:center;
+ gap:6px 10px;
+}
+.executive-metric>div{display:contents}
+.executive-metric>div>span{font-size:13px;line-height:1.2}
+.executive-metric>div>strong,.executive-metric>div>small{grid-column:1 / -1}
+.executive-metric>div>small{align-self:start;line-height:1.4}
+
 .executive-metric small,.executive-chart p,.executive-recent p{color:var(--subtle)}
 .executive-metric-icon{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:10px;background:var(--wash);color:var(--blue)}
 .executive-metric-icon svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round}
@@ -164,9 +176,9 @@ html :is(.app-main,.login,dialog) button.primary:hover:not(:disabled){background
 .executive-gridline{stroke:var(--line);fill:none}
 .executive-recent .table-wrap{max-width:100%;overflow:auto}
 .executive-status{display:inline-block;border-radius:5px;background:var(--wash);color:var(--blue);padding:3px 8px}
-@media(max-width:1200px){.executive-dashboard .executive-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 @media(max-width:680px){.executive-charts{grid-template-columns:minmax(0,1fr)}}
-@media(max-width:460px){.executive-dashboard .executive-metrics{grid-template-columns:minmax(0,1fr)}}
+
 
 .executive-financial{display:flex;flex-wrap:wrap;gap:20px}.executive-financial dd{margin:4px 0 0;font-weight:700}
 
@@ -236,8 +248,17 @@ html :is(.app-main,.login,dialog) button.primary:hover:not(:disabled){background
 .executive-operations>div{padding:22px 28px}
 .executive-operations img{max-height:190px;filter:saturate(.74)}
 .executive-dashboard .executive-metric{border-top:1px solid var(--line);min-height:105px}
-.executive-dashboard .executive-metric strong{letter-spacing:-.035em;line-height:1.2}
-.executive-metric-icon{background:#edf4e1;color:#365b48}
+.corporate-dashboard.executive-dashboard .executive-metric strong{
+ font-size:clamp(19px,1.65vw,24px);
+ font-weight:650;
+ font-variant-numeric:tabular-nums lining-nums;
+ letter-spacing:normal;
+ line-height:1.25;
+ white-space:nowrap;
+ overflow-wrap:normal;
+ overflow-x:auto;
+}
+.executive-metric-icon{width:32px;height:32px;background:#edf4e1;color:#365b48}
 .negotiation-dialog .form-grid{overflow-anchor:none}
 @media(max-width:680px){.executive-operations{grid-template-columns:1fr}.executive-operations img{max-height:105px}}
 
